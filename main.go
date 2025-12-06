@@ -36,11 +36,11 @@ func start() error {
 		return err
 	}
 
-	_, err = huffman.NewFromFile(inputFile)
+	algo, err := huffman.NewFromFile(inputFile)
 	if err != nil {
 		return err
 	}
-
+	algo.Encode()
 	return nil
 }
 

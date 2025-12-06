@@ -24,24 +24,36 @@ func getArguments() (string, string, error) {
 		base := filepath.Base(*input)
 		ext := filepath.Ext(base)
 		name := base[:len(base)-len(ext)]
-		return *input, fmt.Sprintf("%s%s", name, OutputExtension), nil
+		return *input, name + OutputExtension, nil
 	}
 
 	return *input, *output, nil
 }
 
 func start() error {
-	inputFile, _, err := getArguments()
+	inputFile, outputFile, err := getArguments()
 	if err != nil {
 		return err
 	}
 
-	algo, err := huffman.NewFromFile(inputFile)
+	infile, err := os.Open(inputFile)
 	if err != nil {
 		return err
 	}
-	algo.Encode()
-	return nil
+	defer infile.Close()
+
+	outfile, err := os.OpenFile(outputFile, os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return nil
+	}
+	defer outfile.Close()
+
+	encoder := huffman.NewEncoder(infile, outfile)
+	err = encoder.Encode()
+	if err != nil {
+		return err
+	}
+	return err
 }
 
 func main() {

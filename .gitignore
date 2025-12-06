@@ -14,3 +14,4 @@ go.work.sum
 .idea/
 .vscode/
 example.txt
+*.hfm

@@ -19,7 +19,9 @@ func NewEncoder(reader io.ReadSeeker, writer io.WriteSeeker) *HuffmanEncoder {
 }
 
 func (encoder *HuffmanEncoder) getFrequencyMap() (map[byte]uint, error) {
-	encoder.reader.Seek(0, io.SeekStart)
+	if _, err := encoder.reader.Seek(0, io.SeekStart); err != nil {
+		return nil, err
+	}
 
 	result := make(map[byte]uint, 1<<8)
 	reader := bufio.NewReader(encoder.reader)
@@ -45,8 +47,11 @@ func (encoder *HuffmanEncoder) Encode() error {
 		return err
 	}
 	root := buildTree(frequencies)
-	err = encoder.writeCodes(root)
-	if err != nil {
+	codes := buildCodes(root)
+	if err := encoder.writeCodes(root); err != nil {
+		return err
+	}
+	if err := encoder.encodeContent(codes); err != nil {
 		return err
 	}
 	return nil
@@ -71,4 +76,36 @@ func (encoder *HuffmanEncoder) writeCodes(root *node) error {
 		return err
 	}
 	return nil
+}
+
+func (encoder *HuffmanEncoder) encodeContent(codes map[byte]string) error {
+	if _, err := encoder.reader.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	reader := bufio.NewReader(encoder.reader)
+	writer := bitio.NewWriter(encoder.writer)
+	buffer := make([]byte, bufferSize)
+	for {
+		readed, err := reader.Read(buffer)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil
+		}
+		for i := range readed {
+			code := codes[buffer[i]]
+			for j := range code {
+				if code[j] == '1' {
+					err = writer.WriteBit(1)
+				} else {
+					err = writer.WriteBit(0)
+				}
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return writer.Flush()
 }

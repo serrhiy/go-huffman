@@ -58,6 +58,14 @@ func (encoder *HuffmanEncoder) writeCodes(root *node) error {
 		return err
 	}
 	bitWriter := bitio.NewWriter(encoder.writer)
-	defer bitWriter.Flush()
-	return writeCodes(root, bitWriter)
+	if err := writeCodes(root, bitWriter); err != nil {
+		return err
+	}
+	if err := bitWriter.WriteByte('\n'); err != nil {
+		return err
+	}
+	if err := bitWriter.Flush(); err != nil {
+		return err
+	}
+	return nil
 }

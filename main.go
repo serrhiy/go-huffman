@@ -42,7 +42,7 @@ func start() error {
 	}
 	defer infile.Close()
 
-	outfile, err := os.OpenFile(outputFile, os.O_WRONLY|os.O_CREATE, 0644)
+	outfile, err := os.OpenFile(outputFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return nil
 	}
@@ -53,7 +53,7 @@ func start() error {
 	if err != nil {
 		return err
 	}
-	return err
+	return nil
 }
 
 func main() {

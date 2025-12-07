@@ -2,22 +2,23 @@ package huffman
 
 import (
 	"bufio"
-	"fmt"
 	"io"
+
+	"github.com/serrhiy/go-huffman/bitio"
 )
 
 const bufferSize = 32 * 1024
 
 type HuffmanEncoder struct {
 	reader io.ReadSeeker
-	writer io.ReadSeeker
+	writer io.WriteSeeker
 }
 
-func NewEncoder(reader io.ReadSeeker, writer io.ReadSeeker) HuffmanEncoder {
-	return HuffmanEncoder{reader, writer}
+func NewEncoder(reader io.ReadSeeker, writer io.WriteSeeker) *HuffmanEncoder {
+	return &HuffmanEncoder{reader, writer}
 }
 
-func (encoder HuffmanEncoder) getFrequencyMap() (map[byte]uint, error) {
+func (encoder *HuffmanEncoder) getFrequencyMap() (map[byte]uint, error) {
 	encoder.reader.Seek(0, io.SeekStart)
 
 	result := make(map[byte]uint, 1<<8)
@@ -38,17 +39,25 @@ func (encoder HuffmanEncoder) getFrequencyMap() (map[byte]uint, error) {
 	return result, nil
 }
 
-func (encoder HuffmanEncoder) Encode() error {
+func (encoder *HuffmanEncoder) Encode() error {
 	frequencies, err := encoder.getFrequencyMap()
 	if err != nil {
 		return err
 	}
 	root := buildTree(frequencies)
-	codes := buildCodes(root)
-
-	for char, code := range codes {
-		fmt.Printf("%q -> %s\n", char, code)
+	err = encoder.writeCodes(root)
+	if err != nil {
+		return err
 	}
-
 	return nil
+}
+
+func (encoder *HuffmanEncoder) writeCodes(root *node) error {
+	_, err := encoder.writer.Seek(0, io.SeekStart)
+	if err != nil {
+		return err
+	}
+	bitWriter := bitio.NewWriter(encoder.writer)
+	defer bitWriter.Flush()
+	return writeCodes(root, bitWriter)
 }

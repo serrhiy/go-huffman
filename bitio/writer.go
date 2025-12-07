@@ -44,7 +44,7 @@ func (writer *Writer) WriteBits(bits byte, n byte) (err error) {
 	bits &= ((1 << n) - 1) << (8 - n)
 
 	if writer.cacheSize+n < 8 {
-		writer.cache |= bits << writer.cacheSize
+		writer.cache |= bits >> writer.cacheSize
 		writer.cacheSize += n
 		return
 	}
@@ -59,11 +59,11 @@ func (writer *Writer) WriteBits(bits byte, n byte) (err error) {
 	return
 }
 
-func (writer *Writer) WriteBit(bit bool) error {
-	if bit {
+func (writer *Writer) WriteBit(bit byte) error {
+	if bit > 0 {
 		return writer.WriteBits(0b10000000, 1)
 	}
-	return writer.WriteBits(0, 1)
+	return writer.WriteBits(0b00000000, 1)
 }
 
 func (writer *Writer) Align() error {
@@ -74,5 +74,8 @@ func (writer *Writer) Align() error {
 }
 
 func (writer *Writer) Flush() error {
+	if err := writer.Align(); err != nil {
+		return err
+	}
 	return writer.out.Flush()
 }

@@ -6,3 +6,7 @@ type node struct {
 	left  *node
 	right *node
 }
+
+func (n node) isLeaf() bool {
+	return n.left == nil && n.right == nil
+}

@@ -61,6 +61,9 @@ func (encoder *HuffmanEncoder) writeCodes(root *node) error {
 	if err := writeCodes(root, bitWriter); err != nil {
 		return err
 	}
+	if err := bitWriter.Align(); err != nil {
+		return err
+	}
 	if err := bitWriter.WriteByte('\n'); err != nil {
 		return err
 	}

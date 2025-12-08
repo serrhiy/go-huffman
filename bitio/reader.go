@@ -2,13 +2,12 @@ package bitio
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 )
 
 type Reader struct {
 	in bufio.Reader
-	
+
 	cache     byte
 	cacheSize byte
 }
@@ -25,7 +24,6 @@ func (reader *Reader) ReadBit() (byte, error) {
 		return value, nil
 	}
 	readed, err := reader.in.ReadByte()
-	fmt.Println(readed)
 	if err != nil {
 		return 0, err
 	}

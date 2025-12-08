@@ -4,19 +4,18 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 
 	"github.com/serrhiy/go-huffman/bitio"
 )
 
 type HuffmanDecoder struct {
-	reader io.Reader
-	writer io.Writer
+	reader *bufio.Reader
+	writer *bufio.Writer
 }
 
 func NewDecoder(reader io.Reader, writer io.Writer) *HuffmanDecoder {
-	return &HuffmanDecoder{reader, writer}
+	return &HuffmanDecoder{bufio.NewReader(reader), bufio.NewWriter(writer)}
 }
 
 func _readTree(reader *bitio.Reader) (*node, error) {
@@ -49,8 +48,7 @@ func _readTree(reader *bitio.Reader) (*node, error) {
 }
 
 func (decoder *HuffmanDecoder) readTree() (*node, error) {
-	reader := bufio.NewReader(decoder.reader)
-	header, err := reader.ReadBytes('\n')
+	header, err := decoder.reader.ReadBytes('\n')
 	if err != nil {
 		return nil, err
 	}
@@ -70,9 +68,27 @@ func (decoder *HuffmanDecoder) Decode() error {
 	if err != nil {
 		return err
 	}
-	codes := buildCodes(root)
-	for key, value := range codes {
-		fmt.Printf("%q -> %s\n", key, value)
+	codes := buildReverseCodes(root)
+	reader := bitio.NewReader(decoder.reader)
+	writer := bufio.NewWriter(decoder.writer)
+	code := ""
+	for {
+		bit, err := reader.ReadBit()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+		if bit == 1 {
+			code += "1"
+		} else {
+			code += "0"
+		}
+		if char, ok := codes[code]; ok {
+			writer.WriteByte(char)
+			code = ""
+		}
 	}
-	return nil
+	return writer.Flush()
 }

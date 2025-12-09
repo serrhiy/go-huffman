@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"testing"
+	"math/rand"
 )
 
 type errWriter struct {
@@ -130,6 +131,49 @@ func TestWriterError(t *testing.T) {
 	if _, err := w.Write([]byte{1, 2}); err != nil {
 		if err := w.Flush(); err != nil {
 			t.Fatalf("expected write error")
+		}
+	}
+}
+
+func TestReaderWriterChain(t *testing.T) {
+	buf := &bytes.Buffer{}
+	w := NewWriter(buf)
+
+	rng := rand.New(rand.NewSource(1))
+
+	values := make([]byte, 50000)
+	bits := make([]byte, len(values))
+
+	for i := range values {
+		values[i] = byte(rng.Int31n(255))
+		bits[i] = byte(1 + rng.Int31n(7))
+		err := w.WriteBits(values[i], bits[i])
+		if err != nil {
+			t.Fatalf("write error: %v", err)
+		}
+	}
+
+	w.Flush()
+
+	r := NewReader(bytes.NewBuffer(buf.Bytes()))
+
+	for i := range values {
+		var out byte
+		var err error
+
+		for b := byte(0); b < bits[i]; b++ {
+			var bit byte
+			bit, err = r.ReadBit()
+			if err != nil {
+				t.Fatalf("read error at %d: %v", i, err)
+			}
+			out = (out << 1) | bit
+		}
+
+		expect := values[i] >> (8 - bits[i])
+
+		if out != expect {
+			t.Fatalf("mismatch at %d: expected %08b got %08b", i, expect, out)
 		}
 	}
 }

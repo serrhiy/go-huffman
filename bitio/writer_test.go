@@ -55,6 +55,37 @@ func TestWriterBasic(t *testing.T) {
 	}
 }
 
+func TestWriteBitPatterns(t *testing.T) {
+	tests := []struct {
+		bits []byte
+		want byte
+	}{
+		{[]byte{0,0,0,0,0,0,0,0}, 0x00},
+		{[]byte{1,1,1,1,1,1,1,1}, 0xFF},
+		{[]byte{1,0,1,0,1,0,1,0}, 0xAA},
+		{[]byte{0,1,0,1,0,1,0,1}, 0x55},
+	}
+
+	for _, tc := range tests {
+		buf := &bytes.Buffer{}
+		w := NewWriter(buf)
+
+		for _, b := range tc.bits {
+			if err := w.WriteBit(b); err != nil {
+				t.Fatalf("write error: %v", err)
+			}
+		}
+
+		if err := w.Flush(); err != nil {
+			t.Fatalf("flush error: %v", err)
+		}
+
+		if buf.Bytes()[0] != tc.want {
+			t.Fatalf("expected %08b got %08b", tc.want, buf.Bytes()[0])
+		}
+	}
+}
+
 func TestWriterByteByByte(t *testing.T) {
 	buf := &bytes.Buffer{}
 	w := NewWriter(buf)
@@ -104,22 +135,54 @@ func TestWriterBitsAcrossByteBoundary(t *testing.T) {
 	}
 }
 
-func TestWriterAlign(t *testing.T) {
+func TestWriteBitsAcrossByte(t *testing.T) {
 	buf := &bytes.Buffer{}
 	w := NewWriter(buf)
 
-	w.WriteBit(1)
-	w.WriteBit(0)
-
-	err := w.Align()
-	if err != nil {
-		t.Fatalf("Align failed: %v", err)
+	if err := w.WriteBits(0b11100000, 3); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.WriteBits(0b10101000, 5); err != nil {
+		t.Fatal(err)
 	}
 
 	w.Flush()
 
+	want := byte(0b11110101)
+	got := buf.Bytes()[0]
+
+	if got != want {
+		t.Fatalf("expected %08b got %08b", want, got)
+	}
+}
+
+func TestAlignWriter(t *testing.T) {
+	buf := &bytes.Buffer{}
+	w := NewWriter(buf)
+
+	w.WriteBits(0b11100000, 3)
+
+	if err := w.Align(); err != nil {
+		t.Fatalf("Align error: %v", err)
+	}
+
+	if err := w.Flush(); err != nil {
+		t.Fatalf("Flush error: %v", err)
+	}
+
 	if len(buf.Bytes()) != 1 {
 		t.Fatalf("expected 1 byte after align, got %d", len(buf.Bytes()))
+	}
+
+	want := byte(0b11100000)
+	got := buf.Bytes()[0]
+
+	if got != want {
+		t.Fatalf("expected %08b got %08b", want, got)
+	}
+
+	if w.cacheSize != 0 {
+		t.Fatalf("expected cacheSize=0 got %d", w.cacheSize)
 	}
 }
 

@@ -240,3 +240,32 @@ func TestReaderWriterChain(t *testing.T) {
 		}
 	}
 }
+
+
+func TestAlignVariousCacheSizes(t *testing.T) {
+	for bits := byte(1); bits < 8; bits++ {
+		buf := &bytes.Buffer{}
+		w := NewWriter(buf)
+
+		w.WriteBits(0xFF, bits)
+
+		if err := w.Align(); err != nil {
+			t.Fatalf("Align failed for bits=%d: %v", bits, err)
+		}
+
+		if err := w.Flush(); err != nil {
+			t.Fatalf("Flush failes: %v", err)
+		}
+
+		if len(buf.Bytes()) != 1 {
+			t.Fatalf("expected 1 byte for bits=%d got %d bytes", bits, len(buf.Bytes()))
+		}
+
+		result := buf.Bytes()[0]
+		expected := byte(((1 << bits) - 1) << (8 - bits))
+
+		if result != expected {
+			t.Fatalf("invalid bit value: %d, expected: %d", result, expected)
+		}
+	}
+}

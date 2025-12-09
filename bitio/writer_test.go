@@ -3,8 +3,8 @@ package bitio
 import (
 	"bytes"
 	"errors"
-	"testing"
 	"math/rand"
+	"testing"
 )
 
 type errWriter struct {
@@ -60,10 +60,10 @@ func TestWriteBitPatterns(t *testing.T) {
 		bits []byte
 		want byte
 	}{
-		{[]byte{0,0,0,0,0,0,0,0}, 0x00},
-		{[]byte{1,1,1,1,1,1,1,1}, 0xFF},
-		{[]byte{1,0,1,0,1,0,1,0}, 0xAA},
-		{[]byte{0,1,0,1,0,1,0,1}, 0x55},
+		{[]byte{0, 0, 0, 0, 0, 0, 0, 0}, 0x00},
+		{[]byte{1, 1, 1, 1, 1, 1, 1, 1}, 0xFF},
+		{[]byte{1, 0, 1, 0, 1, 0, 1, 0}, 0xAA},
+		{[]byte{0, 1, 0, 1, 0, 1, 0, 1}, 0x55},
 	}
 
 	for _, tc := range tests {
@@ -240,7 +240,6 @@ func TestReaderWriterChain(t *testing.T) {
 		}
 	}
 }
-
 
 func TestAlignVariousCacheSizes(t *testing.T) {
 	for bits := byte(1); bits < 8; bits++ {

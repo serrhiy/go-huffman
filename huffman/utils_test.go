@@ -5,6 +5,10 @@ import (
 	"testing"
 )
 
+func leaf(char byte, count uint) *node {
+	return &node{char: char, count: count}
+}
+
 func TestToPriorityQueueEmpty(t *testing.T) {
 	freq := map[byte]uint{}
 	pq := toPriorityQueue(freq)
@@ -141,5 +145,105 @@ func TestBuildTreeDeterministic(t *testing.T) {
 
 	if sum1 != sum2 {
 		t.Fatalf("trees differ: leaf sums %d vs %d", sum1, sum2)
+	}
+}
+
+func TestBuildCodesSingleLeaf(t *testing.T) {
+	root := leaf('x', 5)
+
+	codes := buildCodes(root)
+
+	if len(codes) != 1 {
+		t.Fatalf("expected 1 code, got %d", len(codes))
+	}
+
+	if code := codes['x']; code != "" {
+		t.Fatalf("single leaf must have empty code, got %q", code)
+	}
+}
+
+func TestBuildCodesTwoLeaves(t *testing.T) {
+	root := &node{
+		left:  leaf('A', 2),
+		right: leaf('B', 3),
+	}
+
+	codes := buildCodes(root)
+
+	if codes['A'] != "1" {
+		t.Fatalf("expected A = 1, got %q", codes['A'])
+	}
+	if codes['B'] != "0" {
+		t.Fatalf("expected B = 0, got %q", codes['B'])
+	}
+}
+
+func TestBuildCodesMultiLevel(t *testing.T) {
+	//         (*)
+	//       /     \
+	//     (*)      C
+	//    /   \
+	//   A     B
+	root := &node{
+		left: &node{
+			left:  leaf('A', 5),
+			right: leaf('B', 7),
+		},
+		right: leaf('C', 10),
+	}
+
+	codes := buildCodes(root)
+
+	if codes['A'] != "11" {
+		t.Fatalf("expected A → 11, got %q", codes['A'])
+	}
+	if codes['B'] != "10" {
+		t.Fatalf("expected B → 10, got %q", codes['B'])
+	}
+	if codes['C'] != "0" {
+		t.Fatalf("expected C → 0, got %q", codes['C'])
+	}
+}
+
+func TestBuildCodesUniqueness(t *testing.T) {
+	root := &node{
+		left: leaf('A', 1),
+		right: &node{
+			left:  leaf('B', 2),
+			right: leaf('C', 3),
+		},
+	}
+
+	codes := buildCodes(root)
+
+	seen := map[string]bool{}
+	for ch, code := range codes {
+		if seen[code] {
+			t.Fatalf("duplicate code %q for %q", code, ch)
+		}
+		seen[code] = true
+	}
+}
+
+func TestBuildCodesNoPrefixes(t *testing.T) {
+	root := &node{
+		left: &node{
+			left:  leaf('A', 1),
+			right: leaf('B', 2),
+		},
+		right: leaf('C', 3),
+	}
+
+	codes := buildCodes(root)
+
+	for k1, c1 := range codes {
+		for k2, c2 := range codes {
+			if k1 == k2 {
+				continue
+			}
+			if len(c1) < len(c2) && c2[:len(c1)] == c1 {
+				t.Fatalf("code %q is prefix of %q", c1, c2)
+			}
+		}
 	}
 }

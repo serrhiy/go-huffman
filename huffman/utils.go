@@ -17,6 +17,10 @@ func toPriorityQueue(frequencies map[byte]uint) priorityQueue {
 
 func buildTree(frequencies map[byte]uint) *node {
 	queue := toPriorityQueue(frequencies)
+	if queue.Len() == 1 {
+		left := heap.Pop(&queue).(*node)
+		return &node{0, left.count, left, nil}
+	}
 	for queue.Len() > 1 {
 		node1 := heap.Pop(&queue).(*node)
 		node2 := heap.Pop(&queue).(*node)
@@ -63,6 +67,9 @@ func buildReverseCodes(root *node) map[string]byte {
 }
 
 func writeCodes(root *node, writer *bitio.Writer) error {
+	if root == nil {
+		return nil
+	}
 	if root.isLeaf() {
 		if err := writer.WriteBit(1); err != nil {
 			return err

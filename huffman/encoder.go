@@ -11,7 +11,7 @@ const bufferSize = 32 * 1024
 
 type HuffmanEncoder struct {
 	reader io.ReadSeeker
-	writer io.WriteSeeker
+	writer io.Writer
 }
 
 func NewEncoder(reader io.ReadSeeker, writer io.WriteSeeker) *HuffmanEncoder {
@@ -58,10 +58,6 @@ func (encoder *HuffmanEncoder) Encode() error {
 }
 
 func (encoder *HuffmanEncoder) writeCodes(root *node) error {
-	_, err := encoder.writer.Seek(0, io.SeekStart)
-	if err != nil {
-		return err
-	}
 	bitWriter := bitio.NewWriter(encoder.writer)
 	if err := writeCodes(root, bitWriter); err != nil {
 		return err

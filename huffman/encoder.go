@@ -14,7 +14,7 @@ type HuffmanEncoder struct {
 	writer io.Writer
 }
 
-func NewEncoder(reader io.ReadSeeker, writer io.WriteSeeker) *HuffmanEncoder {
+func NewEncoder(reader io.ReadSeeker, writer io.Writer) *HuffmanEncoder {
 	return &HuffmanEncoder{reader, writer}
 }
 
@@ -45,6 +45,9 @@ func (encoder *HuffmanEncoder) Encode() error {
 	frequencies, err := encoder.getFrequencyMap()
 	if err != nil {
 		return err
+	}
+	if len(frequencies) == 0 {
+		return nil
 	}
 	root := buildTree(frequencies)
 	codes := buildCodes(root)

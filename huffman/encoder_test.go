@@ -97,3 +97,98 @@ func TestHuffmanEncoderGetFrequencyMapReadError(t *testing.T) {
 		t.Fatalf("expected read error, got nil")
 	}
 }
+
+type failingWriter struct {
+	n int
+}
+
+func (fw *failingWriter) Write(p []byte) (int, error) {
+	if fw.n <= 0 {
+		return 0, errors.New("write failed")
+	}
+	if len(p) > fw.n {
+		p = p[:fw.n]
+	}
+	fw.n -= len(p)
+	return len(p), nil
+}
+
+func TestWriteCodesSingleLeaf(t *testing.T) {
+	root := &node{char: 'Z', count: 1}
+
+	buf := &bytes.Buffer{}
+	enc := NewEncoder(nil, buf)
+
+	if err := enc.writeCodes(root); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	out := buf.Bytes()
+	if len(out) < 2 {
+		t.Fatalf("expected at least 1 byte + newline, got: %v", out)
+	}
+	if out[len(out)-1] != '\n' {
+		t.Fatalf("expected newline, got %v", out)
+	}
+}
+
+func TestWriteCodesSimpleTree(t *testing.T) {
+	root := &node{
+		left:  &node{char: 'A', count: 3},
+		right: &node{char: 'B', count: 5},
+	}
+
+	buf := &bytes.Buffer{}
+	enc := NewEncoder(nil, buf)
+
+	err := enc.writeCodes(root)
+	if err != nil {
+		t.Fatalf("writeCodes returned error: %v", err)
+	}
+
+	b := buf.Bytes()
+	if len(b) == 0 || b[len(b)-1] != '\n' {
+		t.Fatalf("expected ending newline, got %v", b)
+	}
+
+	if len(b) <= 1 {
+		t.Fatalf("expected some bit-encoded data before newline")
+	}
+}
+
+func TestWriteCodesWriterError(t *testing.T) {
+	root := &node{char: 'X', count: 1}
+
+	fw := &failingWriter{n: 0}
+	enc := NewEncoder(nil, fw)
+
+	err := enc.writeCodes(root)
+	if err == nil {
+		t.Fatalf("expected writer error")
+	}
+}
+
+func TestWriteCodesAlignCalled(t *testing.T) {
+	root := &node{
+		left:  &node{char: 'A', count: 1},
+		right: &node{char: 'B', count: 2},
+	}
+
+	buf := &bytes.Buffer{}
+	enc := NewEncoder(nil, buf)
+
+	err := enc.writeCodes(root)
+	if err != nil {
+		t.Fatalf("writeCodes error: %v", err)
+	}
+
+	out := buf.Bytes()
+
+	if len(out) < 2 {
+		t.Fatalf("expected data + newline, got too short: %v", out)
+	}
+
+	if out[len(out)-1] != '\n' {
+		t.Fatalf("expected newline, got: %v", out)
+	}
+}

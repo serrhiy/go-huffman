@@ -64,7 +64,7 @@ func (decoder *HuffmanDecoder) readTree() (*node, error) {
 
 func (decoder *HuffmanDecoder) Decode() error {
 	root, err := decoder.readTree()
-	if err != nil{
+	if err != nil {
 		return err
 	}
 	if root == nil {

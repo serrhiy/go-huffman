@@ -3,7 +3,6 @@ package huffman
 import (
 	"bufio"
 	"bytes"
-	"errors"
 	"io"
 
 	"github.com/serrhiy/go-huffman/bitio"
@@ -53,7 +52,7 @@ func (decoder *HuffmanDecoder) readTree() (*node, error) {
 		return nil, err
 	}
 	if len(header) == 0 {
-		return nil, errors.New("input file is empty")
+		return nil, nil
 	}
 	header = header[0 : len(header)-1]
 	root, err := _readTree(bitio.NewReader(bytes.NewReader(header)))
@@ -65,8 +64,11 @@ func (decoder *HuffmanDecoder) readTree() (*node, error) {
 
 func (decoder *HuffmanDecoder) Decode() error {
 	root, err := decoder.readTree()
-	if err != nil {
+	if err != nil{
 		return err
+	}
+	if root == nil {
+		return nil
 	}
 	codes := buildReverseCodes(root)
 	reader := bitio.NewReader(decoder.reader)

@@ -56,18 +56,15 @@ func TestReadTreeTwoLeaves(t *testing.T) {
 }
 
 func TestReadTreeEmptyInput(t *testing.T) {
-	buf := &bytes.Buffer{}
-	decoder := NewDecoder(buf, &bytes.Buffer{})
-	_, err := decoder.readTree()
-	if err == nil {
-		t.Fatal("expected error for empty input")
+	decoder := NewDecoder(&bytes.Buffer{}, &bytes.Buffer{})
+	if _, err := decoder.readTree(); err != nil {
+		t.Fatalf("reading an empty file should not cause an error: %v", err)
 	}
 }
 
-func TestReadTreeReaderError(t *testing.T) {
+func TestReadTreeEmptyReaderError(t *testing.T) {
 	decoder := NewDecoder(&brokenReader{}, &bytes.Buffer{})
-	_, err := decoder.readTree()
-	if err == nil {
+	if _, err := decoder.readTree(); err == nil {
 		t.Fatal("expected read error")
 	}
 }
@@ -127,5 +124,18 @@ func TestReadTreeLargeTree(t *testing.T) {
 	}
 	if !root.right.isLeaf() || root.right.char != 'C' {
 		t.Fatalf("right incorrect: %+v", root.right)
+	}
+}
+
+func TestDecode_EmptyInputWritesNothing(t *testing.T) {
+	out := &bytes.Buffer{}
+	dec := NewDecoder(&bytes.Buffer{}, out)
+
+	if err := dec.Decode(); err != nil {
+		t.Fatalf("Decode failed: %v", err)
+	}
+
+	if out.Len() != 0 {
+		t.Fatalf("expected empty output, got %v bytes", out.Len())
 	}
 }

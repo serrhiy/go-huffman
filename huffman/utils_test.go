@@ -247,3 +247,143 @@ func TestBuildCodesNoPrefixes(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildReverseCodesSingleLeaf(t *testing.T) {
+	root := &node{char: 'A'}
+	codes := buildReverseCodes(root)
+
+	if len(codes) != 1 {
+		t.Fatalf("expected 1 code, got %d", len(codes))
+	}
+	if codes[""] != 'A' {
+		t.Fatalf("expected code '' -> 'A', got %v", codes)
+	}
+}
+
+func TestBuildReverseCodesTwoLeaves(t *testing.T) {
+	root := &node{
+		left:  &node{char: 'A'},
+		right: &node{char: 'B'},
+	}
+	codes := buildReverseCodes(root)
+
+	if len(codes) != 2 {
+		t.Fatalf("expected 2 codes, got %d", len(codes))
+	}
+	if codes["1"] != 'A' || codes["0"] != 'B' {
+		t.Fatalf("incorrect codes: %v", codes)
+	}
+}
+
+func TestBuildReverseCodesThreeLeaves(t *testing.T) {
+	root := &node{
+		left: &node{
+			left:  &node{char: 'A'},
+			right: &node{char: 'B'},
+		},
+		right: &node{char: 'C'},
+	}
+	codes := buildReverseCodes(root)
+
+	expected := map[string]byte{
+		"11": 'A',
+		"10": 'B',
+		"0":  'C',
+	}
+
+	if len(codes) != 3 {
+		t.Fatalf("expected 3 codes, got %d", len(codes))
+	}
+
+	for k, v := range expected {
+		if codes[k] != v {
+			t.Fatalf("expected code %s -> %c, got %v", k, v, codes)
+		}
+	}
+}
+
+func TestBuildReverseCodesNilTree(t *testing.T) {
+	codes := buildReverseCodes(nil)
+	if len(codes) != 0 {
+		t.Fatalf("expected empty map for nil tree, got %v", codes)
+	}
+}
+
+func TestBuildReverseCodesLeftOnlyTree(t *testing.T) {
+	root := &node{
+		left: &node{
+			left: &node{
+				left: &node{char: 'A'},
+			},
+		},
+	}
+	codes := buildReverseCodes(root)
+
+	if len(codes) != 1 {
+		t.Fatalf("expected 1 code, got %d", len(codes))
+	}
+
+	for k, v := range codes {
+		if v != 'A' {
+			t.Fatalf("expected 'A', got %c", v)
+		}
+		if k != "111" {
+			t.Fatalf("expected code '111', got %s", k)
+		}
+	}
+}
+
+func TestBuildReverseCodesRightOnlyTree(t *testing.T) {
+	root := &node{
+		right: &node{
+			right: &node{
+				right: &node{char: 'Z'},
+			},
+		},
+	}
+	codes := buildReverseCodes(root)
+
+	if len(codes) != 1 {
+		t.Fatalf("expected 1 code, got %d", len(codes))
+	}
+
+	for k, v := range codes {
+		if v != 'Z' {
+			t.Fatalf("expected 'Z', got %c", v)
+		}
+		if k != "000" {
+			t.Fatalf("expected code '000', got %s", k)
+		}
+	}
+}
+
+func TestBuildReverseCodesComplexTree(t *testing.T) {
+	root := &node{
+		left: &node{
+			left:  &node{char: 'A'},
+			right: &node{char: 'B'},
+		},
+		right: &node{
+			left:  &node{char: 'C'},
+			right: &node{char: 'D'},
+		},
+	}
+	codes := buildReverseCodes(root)
+
+	expected := map[string]byte{
+		"11": 'A',
+		"10": 'B',
+		"01": 'C',
+		"00": 'D',
+	}
+
+	if len(codes) != 4 {
+		t.Fatalf("expected 4 codes, got %d", len(codes))
+	}
+
+	for k, v := range expected {
+		if codes[k] != v {
+			t.Fatalf("expected code %s -> %c, got %v", k, v, codes)
+		}
+	}
+}

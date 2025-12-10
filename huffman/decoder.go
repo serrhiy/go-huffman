@@ -40,7 +40,7 @@ func _readTree(reader *bitio.Reader) (*node, error) {
 	right, err := _readTree(reader)
 	if err != nil {
 		if err == io.EOF {
-			return &node{0, 0, left, right}, nil
+			return nil, nil
 		}
 		return nil, err
 	}
@@ -49,7 +49,7 @@ func _readTree(reader *bitio.Reader) (*node, error) {
 
 func (decoder *HuffmanDecoder) readTree() (*node, error) {
 	header, err := decoder.reader.ReadBytes('\n')
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return nil, err
 	}
 	if len(header) == 0 {

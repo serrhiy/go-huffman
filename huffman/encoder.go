@@ -90,7 +90,7 @@ func (encoder *HuffmanEncoder) encodeContent(codes map[byte]string) error {
 			if err == io.EOF {
 				break
 			}
-			return nil
+			return err
 		}
 		for i := range readed {
 			code := codes[buffer[i]]

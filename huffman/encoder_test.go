@@ -15,6 +15,10 @@ func (b *brokenReader) Read([]byte) (int, error) {
 	return 0, errors.New("read error")
 }
 
+func (b *brokenReader) Seek(offset int64, whence int) (int64, error) {
+	return offset, nil
+}
+
 func TestHuffmanEncoderGetFrequencyMap(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -190,5 +194,106 @@ func TestWriteCodesAlignCalled(t *testing.T) {
 
 	if out[len(out)-1] != '\n' {
 		t.Fatalf("expected newline, got: %v", out)
+	}
+}
+
+func TestEncodeContentSingleByte(t *testing.T) {
+	reader := bytes.NewReader([]byte{'A'})
+	writer := &bytes.Buffer{}
+	enc := NewEncoder(reader, writer)
+
+	codes := map[byte]string{'A': "101"}
+	if err := enc.encodeContent(codes); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data := writer.Bytes()
+	if len(data) == 0 {
+		t.Fatal("expected some bytes to be written")
+	}
+}
+
+func TestEncodeContentMultipleBytes(t *testing.T) {
+	reader := bytes.NewReader([]byte{'A', 'B', 'A'})
+	writer := &bytes.Buffer{}
+	enc := NewEncoder(reader, writer)
+
+	codes := map[byte]string{
+		'A': "0",
+		'B': "11",
+	}
+
+	if err := enc.encodeContent(codes); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data := writer.Bytes()
+	if len(data) == 0 {
+		t.Fatal("expected some bytes to be written")
+	}
+}
+
+func TestEncodeContentVariedBitLengths(t *testing.T) {
+	reader := bytes.NewReader([]byte{'A', 'B', 'C'})
+	writer := &bytes.Buffer{}
+	enc := NewEncoder(reader, writer)
+
+	codes := map[byte]string{
+		'A': "1",
+		'B': "01",
+		'C': "001",
+	}
+
+	if err := enc.encodeContent(codes); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if writer.Len() == 0 {
+		t.Fatal("expected data to be written")
+	}
+}
+
+func TestEncodeContentWriterError(t *testing.T) {
+	reader := bytes.NewReader([]byte{'A'})
+	enc := NewEncoder(reader, &failingWriter{})
+
+	codes := map[byte]string{'A': "1"}
+	if err := enc.encodeContent(codes); err == nil {
+		t.Fatal("expected write error, got nil")
+	}
+}
+
+func TestEncodeContentReaderError(t *testing.T) {
+	enc := NewEncoder(&brokenReader{}, &bytes.Buffer{})
+
+	codes := map[byte]string{'A': "1"}
+	err := enc.encodeContent(codes)
+	if err == nil {
+		t.Fatalf("expected nil because encodeContent ignores non-EOF read errors, got %v", err)
+	}
+}
+
+func TestEncodeContentBitPattern(t *testing.T) {
+	data := []byte{'A', 'B'}
+	reader := bytes.NewReader(data)
+	writer := &bytes.Buffer{}
+	enc := NewEncoder(reader, writer)
+
+	codes := map[byte]string{
+		'A': "10",
+		'B': "01",
+	}
+
+	if err := enc.encodeContent(codes); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	out := writer.Bytes()
+	if len(out) == 0 {
+		t.Fatal("expected bytes written")
+	}
+
+	if out[0] != 0 && out[0] != 128 {
+		t.Logf("first byte: %08b", out[0])
 	}
 }

@@ -2,6 +2,7 @@ package huffman
 
 import (
 	"bufio"
+	"encoding/binary"
 	"io"
 
 	"github.com/serrhiy/go-huffman/bitio"
@@ -61,14 +62,15 @@ func (encoder *HuffmanEncoder) Encode() error {
 }
 
 func (encoder *HuffmanEncoder) writeCodes(root *node) error {
+	b := make([]byte, 2)
+	treeSize := calculateTreeSize(root)
+	binary.LittleEndian.PutUint16(b, treeSize)
+
 	bitWriter := bitio.NewWriter(encoder.writer)
+	if _, err := bitWriter.Write(b); err != nil {
+		return err
+	}
 	if err := writeCodes(root, bitWriter); err != nil {
-		return err
-	}
-	if err := bitWriter.Align(); err != nil {
-		return err
-	}
-	if err := bitWriter.WriteByte('\n'); err != nil {
 		return err
 	}
 	if err := bitWriter.Flush(); err != nil {

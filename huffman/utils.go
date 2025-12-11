@@ -30,6 +30,16 @@ func buildTree(frequencies map[byte]uint) *node {
 	return heap.Pop(&queue).(*node)
 }
 
+func calculateTreeSize(root *node) uint16 {
+	if root == nil {
+		return 0
+	}
+	if root.isLeaf() {
+		return 1 + 8
+	}
+	return 1 + calculateTreeSize(root.left) + calculateTreeSize(root.right)
+}
+
 func _buildCodes(root *node, prefix string, table map[byte]string) {
 	if root == nil {
 		return

@@ -2,7 +2,7 @@ package huffman
 
 import (
 	"bufio"
-	"bytes"
+	"encoding/binary"
 	"io"
 
 	"github.com/serrhiy/go-huffman/bitio"
@@ -17,69 +17,76 @@ func NewDecoder(reader io.Reader, writer io.Writer) *HuffmanDecoder {
 	return &HuffmanDecoder{bufio.NewReader(reader), bufio.NewWriter(writer)}
 }
 
-func _readTree(reader *bitio.Reader) (*node, error) {
-	bit, err := reader.ReadBit()
-	if err != nil {
-		return nil, err
-	}
-	if bit == 1 {
-		b, err := reader.ReadByte()
+func _readTree(reader *bitio.Reader, length uint16) (*node, error) {
+	var readed uint16 = 0
+	var next func() (*node, error)
+	next = func() (*node, error) {
+		bit, err := reader.ReadBit()
 		if err != nil {
 			return nil, err
 		}
-		return &node{b, 0, nil, nil}, nil
-	}
-	left, err := _readTree(reader)
-	if err != nil {
-		if err == io.EOF {
+		readed += 1
+		if bit == 1 {
+			b, err := reader.ReadByte()
+			if err != nil {
+				return nil, err
+			}
+			readed += 8
+			return &node{b, 0, nil, nil}, nil
+		}
+		left, err := next()
+		if err != nil {
+			return nil, err
+		}
+		if readed >= length {
 			return &node{0, 0, left, nil}, nil
 		}
-		return nil, err
-	}
-	right, err := _readTree(reader)
-	if err != nil {
-		if err == io.EOF {
-			return nil, nil
+
+		right, err := next()
+		if err != nil {
+			return nil, err
 		}
-		return nil, err
+		return &node{0, 0, left, right}, nil
 	}
-	return &node{0, 0, left, right}, nil
+	return next()
 }
 
-func (decoder *HuffmanDecoder) readTree() (*node, error) {
-	header, err := decoder.reader.ReadBytes('\n')
-	if err != nil && err != io.EOF {
+func (decoder *HuffmanDecoder) readTree(reader *bitio.Reader) (*node, error) {
+	buffer := make([]byte, 2)
+	if _, err := reader.Read(buffer); err != nil {
 		return nil, err
 	}
-	if len(header) == 0 {
-		return nil, nil
-	}
-	header = header[0 : len(header)-1]
-	root, err := _readTree(bitio.NewReader(bytes.NewReader(header)))
-	if err != nil && err != io.EOF {
-		return nil, err
-	}
-	return root, nil
+
+	headerSize := binary.LittleEndian.Uint16(buffer)
+	return _readTree(reader, headerSize)
 }
 
 func (decoder *HuffmanDecoder) Decode() error {
-	root, err := decoder.readTree()
+	reader := bitio.NewReader(decoder.reader)
+	root, err := decoder.readTree(reader)
 	if err != nil {
+		if err == io.EOF {
+			return nil
+		}
 		return err
 	}
-	if root == nil {
-		return nil
+	if err := reader.Align(); err != nil {
+		return err
 	}
+
+	buffer := make([]byte, 8)
+	if _, err := reader.Read(buffer); err != nil {
+		return err
+	}
+	length := binary.LittleEndian.Uint64(buffer)
 	codes := buildReverseCodes(root)
-	reader := bitio.NewReader(decoder.reader)
 	writer := bufio.NewWriter(decoder.writer)
 	code := ""
-	for {
+	var total uint64 = 0
+	for total < length {
 		bit, err := reader.ReadBit()
+		total += 1
 		if err != nil {
-			if err == io.EOF {
-				break
-			}
 			return err
 		}
 		if bit == 1 {

@@ -56,3 +56,12 @@ func (reader *Reader) Read(buffer []byte) (int, error) {
 	}
 	return 0, nil
 }
+
+func (reader *Reader) Align() error {
+	for reader.cacheSize != 0 {
+		if _, err := reader.ReadBit(); err != nil {
+			return err
+		}
+	}
+	return nil
+}

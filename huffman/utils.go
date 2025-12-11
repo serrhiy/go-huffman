@@ -40,6 +40,14 @@ func calculateTreeSize(root *node) uint16 {
 	return 1 + calculateTreeSize(root.left) + calculateTreeSize(root.right)
 }
 
+func calculateContentSize(codes map[byte]string, frequencies map[byte]uint) uint64 {
+	var size uint64 = 0
+	for char, code := range codes {
+		size += uint64(frequencies[char] * uint(len(code)))
+	}
+	return size
+}
+
 func _buildCodes(root *node, prefix string, table map[byte]string) {
 	if root == nil {
 		return

@@ -52,10 +52,11 @@ func (encoder *HuffmanEncoder) Encode() error {
 	}
 	root := buildTree(frequencies)
 	codes := buildCodes(root)
+	length := calculateContentSize(codes, frequencies)
 	if err := encoder.writeCodes(root); err != nil {
 		return err
 	}
-	if err := encoder.encodeContent(codes); err != nil {
+	if err := encoder.encodeContent(codes, length); err != nil {
 		return err
 	}
 	return nil
@@ -79,13 +80,20 @@ func (encoder *HuffmanEncoder) writeCodes(root *node) error {
 	return nil
 }
 
-func (encoder *HuffmanEncoder) encodeContent(codes map[byte]string) error {
+func (encoder *HuffmanEncoder) encodeContent(codes map[byte]string, length uint64) error {
 	if _, err := encoder.reader.Seek(0, io.SeekStart); err != nil {
 		return err
 	}
 	reader := bufio.NewReader(encoder.reader)
 	writer := bitio.NewWriter(encoder.writer)
 	buffer := make([]byte, bufferSize)
+
+	b := make([]byte, 8)
+	binary.LittleEndian.PutUint64(b, length)
+	if _, err := writer.Write(b); err != nil {
+		return err
+	}
+
 	for {
 		readed, err := reader.Read(buffer)
 		if err != nil {

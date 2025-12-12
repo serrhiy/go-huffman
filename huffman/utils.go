@@ -2,6 +2,7 @@ package huffman
 
 import (
 	"container/heap"
+	"fmt"
 
 	"github.com/serrhiy/go-huffman/bitio"
 )
@@ -40,12 +41,16 @@ func calculateTreeSize(root *node) uint16 {
 	return 1 + calculateTreeSize(root.left) + calculateTreeSize(root.right)
 }
 
-func calculateContentSize(codes map[byte]string, frequencies map[byte]uint) uint64 {
+func calculateContentSize(codes map[byte]string, frequencies map[byte]uint) (uint64, error) {
 	var size uint64 = 0
 	for char, code := range codes {
-		size += uint64(frequencies[char] * uint(len(code)))
+		frequency, ok := frequencies[char]
+		if !ok {
+			return 0, fmt.Errorf("char %q exists in codes bit absent in frequency map", char)
+		}
+		size += uint64(frequency * uint(len(code)))
 	}
-	return size
+	return size, nil
 }
 
 func _buildCodes(root *node, prefix string, table map[byte]string) {

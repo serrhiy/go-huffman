@@ -52,7 +52,7 @@ func (encoder *HuffmanEncoder) Encode() error {
 	}
 	root := buildTree(frequencies)
 	codes := buildCodes(root)
-	length := calculateContentSize(codes, frequencies)
+	length, _ := calculateContentSize(codes, frequencies)
 	if err := encoder.writeCodes(root); err != nil {
 		return err
 	}

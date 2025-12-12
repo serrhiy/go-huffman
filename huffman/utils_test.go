@@ -1,6 +1,7 @@
 package huffman
 
 import (
+	"bytes"
 	"container/heap"
 	"testing"
 )
@@ -195,13 +196,13 @@ func TestBuildCodesMultiLevel(t *testing.T) {
 	codes := buildCodes(root)
 
 	if codes['A'] != "11" {
-		t.Fatalf("expected A → 11, got %q", codes['A'])
+		t.Fatalf("expected A -> 11, got %q", codes['A'])
 	}
 	if codes['B'] != "10" {
-		t.Fatalf("expected B → 10, got %q", codes['B'])
+		t.Fatalf("expected B -> 10, got %q", codes['B'])
 	}
 	if codes['C'] != "0" {
-		t.Fatalf("expected C → 0, got %q", codes['C'])
+		t.Fatalf("expected C -> 0, got %q", codes['C'])
 	}
 }
 
@@ -337,5 +338,73 @@ func TestBuildReverseCodesComplexTree(t *testing.T) {
 		if codes[k] != v {
 			t.Fatalf("expected code %s -> %c, got %v", k, v, codes)
 		}
+	}
+}
+
+func TestCalculateContentSizeEmpty(t *testing.T) {
+	codes := make(map[byte]string)
+	frequencies := make(map[byte]uint)
+	size, err := calculateContentSize(codes, frequencies)
+	if err != nil {
+		t.Fatalf("unxepected error: %v", err)
+	}
+	if size != 0 {
+		t.Fatalf("empty calculateContentSize failed, expected 0, got %d", size)
+	}
+}
+
+func TestCalculateContentSize(t *testing.T) {
+	codes := map[byte]string{
+		'a': "1",
+		'b': "01",
+		'c': "00",
+	}
+	frequencies := map[byte]uint{
+		'a': 10,
+		'b': 5,
+		'c': 4,
+	}
+	const expected = 10 + 5*2 + 4*2
+	size, err := calculateContentSize(codes, frequencies)
+	if err != nil {
+		t.Fatalf("unxepected error: %v", err)
+	}
+	if size != expected {
+		t.Fatalf("TestCalculateContentSize failed, expected: %d, got %d", expected, size)
+	}
+}
+
+func TestCalculateContentSizeReal(t *testing.T) {
+	source := []byte("aaaaaaaaaabbbbbcccc")
+	reader := bytes.NewReader(source)
+	encoder := NewEncoder(reader, nil)
+	frequencies, err := encoder.getFrequencyMap()
+	if err != nil {
+		t.Fatalf("unexpected getFrequencyMap error: %v", err)
+	}
+	codes := buildCodes(buildTree(frequencies))
+	const expected = 10 + 5*2 + 4*2
+	size, err := calculateContentSize(codes, frequencies)
+	if err != nil {
+		t.Fatalf("unxepected error: %v", err)
+	}
+	if size != expected {
+		t.Fatalf("TestCalculateContentSizeReal failed, expected: %d, got %d", expected, size)
+	}
+}
+
+func TestCalculateContentSizeError(t *testing.T) {
+	codes := map[byte]string{
+		'a': "1",
+		'b': "01",
+		'c': "00",
+	}
+	frequencies := map[byte]uint{
+		'a': 10,
+		'b': 5,
+		// 'c' is absent
+	}
+	if size, err := calculateContentSize(codes, frequencies); err == nil {
+		t.Fatalf("error expected but got: %d, %v", size, err)
 	}
 }

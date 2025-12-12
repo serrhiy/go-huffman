@@ -242,3 +242,26 @@ func TestEncodeContentWriterError(t *testing.T) {
 		t.Fatal("expected write error, got nil")
 	}
 }
+
+func TestEncodeDeterministicLength(t *testing.T) {
+	input := []byte("this is a test string for huffman encoder")
+	repetitions := 5
+	var lastLen int
+
+	for i := range repetitions {
+		r := bytes.NewReader(input)
+		w := &bytes.Buffer{}
+		enc := NewEncoder(r, w)
+
+		if err := enc.Encode(); err != nil {
+			t.Fatalf("Encode failed: %v", err)
+		}
+
+		encodedLen := w.Len()
+		if i > 0 && encodedLen != lastLen {
+			t.Fatalf("encoded length differs on repetition %d: got %d, want %d", i, encodedLen, lastLen)
+		}
+
+		lastLen = encodedLen
+	}
+}

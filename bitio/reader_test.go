@@ -133,3 +133,31 @@ func TestPartialBufferRead(t *testing.T) {
 		t.Fatalf("expected [0x33 0x44], got %v", buf[:n])
 	}
 }
+
+func TestReaderAlign(t *testing.T) {
+	data := []byte{0b10101010, 0b11001100}
+	r := NewReader(bytes.NewBuffer(data))
+
+	for range 3 {
+		if _, err := r.ReadBit(); err != nil {
+			t.Fatalf("ReadBit error: %v", err)
+		}
+	}
+
+	if err := r.Align(); err != nil {
+		t.Fatalf("Align error: %v", err)
+	}
+
+	if r.cacheSize != 0 {
+		t.Fatalf("Expected empty cache, got: %d, %d", r.cacheSize, r.cache)
+	}
+
+	b, err := r.ReadByte()
+	if err != nil {
+		t.Fatalf("ReadByte error: %v", err)
+	}
+
+	if b != 0b11001100 {
+		t.Fatalf("expected 11001100, got %08b", b)
+	}
+}

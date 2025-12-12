@@ -239,3 +239,25 @@ func TestReaderEmptyInput(t *testing.T) {
 		t.Fatalf("expected EOF for Read(), got (%d, %v)", n, err)
 	}
 }
+
+func TestReaderAlignOnBoundary(t *testing.T) {
+	r := NewReader(bytes.NewBuffer([]byte{0xAA, 0xBB}))
+
+	if err := r.Align(); err != nil {
+		t.Fatalf("Align returned error on empty cache: %v", err)
+	}
+
+	b, err := r.ReadByte()
+	if err != nil || b != 0xAA {
+		t.Fatalf("expected 0xAA, got %02x err=%v", b, err)
+	}
+
+	if err := r.Align(); err != nil {
+		t.Fatalf("Align should still work on boundary")
+	}
+
+	b, err = r.ReadByte()
+	if err != nil || b != 0xBB {
+		t.Fatalf("expected 0xBB, got %02x err=%v", b, err)
+	}
+}

@@ -408,3 +408,32 @@ func TestCalculateContentSizeError(t *testing.T) {
 		t.Fatalf("error expected but got: %d, %v", size, err)
 	}
 }
+
+func TestCalculateTreeSizeEmpty(t *testing.T) {
+	if size := calculateTreeSize(nil); size != 0 {
+		t.Fatalf("expected 0 but got %d", size)
+	}
+}
+
+func TestCalculateTreeSize(t *testing.T) {
+	const expected = 1 + 9 + 1 + 9 + 9
+	root := &node{
+		left: &node{
+			char:  'a',
+			count: 10,
+		},
+		right: &node{
+			left: &node{
+				char:  'b',
+				count: 5,
+			},
+			right: &node{
+				char:  'c',
+				count: 4,
+			},
+		},
+	}
+	if size := calculateTreeSize(root); size != expected {
+		t.Fatalf("calculateTreeSize faled, expected: %d, got %d", expected, size)
+	}
+}

@@ -66,7 +66,7 @@ func _buildCodes(root *node, prefix string, table map[byte]string) {
 }
 
 func buildCodes(root *node) map[byte]string {
-	table := make(map[byte]string, 1<<8)
+	table := make(map[byte]string, 1<<7)
 	_buildCodes(root, "", table)
 	return table
 }
@@ -84,7 +84,7 @@ func _buildReverseCodes(root *node, prefix string, table map[string]byte) {
 }
 
 func buildReverseCodes(root *node) map[string]byte {
-	table := make(map[string]byte, 1<<8)
+	table := make(map[string]byte, 1<<7)
 	_buildReverseCodes(root, "", table)
 	return table
 }

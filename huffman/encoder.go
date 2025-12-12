@@ -24,7 +24,7 @@ func (encoder *HuffmanEncoder) getFrequencyMap() (map[byte]uint, error) {
 		return nil, err
 	}
 
-	result := make(map[byte]uint, 1<<8)
+	result := make(map[byte]uint, 1<<7)
 	reader := bufio.NewReader(encoder.reader)
 	buffer := make([]byte, bufferSize)
 	for {

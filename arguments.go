@@ -18,7 +18,9 @@ func getArgumentsEncode(input, output string) (*arguments, error) {
 		base := filepath.Base(input)
 		ext := filepath.Ext(base)
 		name := base[:len(base)-len(ext)]
-		return &arguments{input, name + OutputExtension}, nil
+		dir := filepath.Dir(input)
+		otuputPath := filepath.Join(dir, name + OutputExtension)
+		return &arguments{input, otuputPath}, nil
 	}
 	return &arguments{input, output}, nil
 }

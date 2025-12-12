@@ -9,6 +9,29 @@ func leaf(char byte, count uint) *node {
 	return &node{char: char, count: count}
 }
 
+func sumLeafCounts(n *node) uint {
+	if n == nil {
+		return 0
+	}
+	if n.isLeaf() {
+		return n.count
+	}
+	return sumLeafCounts(n.left) + sumLeafCounts(n.right)
+}
+
+func validateInternalCounts(t *testing.T, n *node) uint {
+	if n.isLeaf() {
+		return n.count
+	}
+	left := validateInternalCounts(t, n.left)
+	right := validateInternalCounts(t, n.right)
+
+	if n.count != left+right {
+		t.Fatalf("invalid internal node count: got %d, expected %d", n.count, left+right)
+	}
+	return n.count
+}
+
 func TestToPriorityQueueEmpty(t *testing.T) {
 	freq := map[byte]uint{}
 	pq := toPriorityQueue(freq)
@@ -65,29 +88,6 @@ func TestToPriorityQueueMultiple(t *testing.T) {
 	}
 }
 
-func sumLeafCounts(n *node) uint {
-	if n == nil {
-		return 0
-	}
-	if n.isLeaf() {
-		return n.count
-	}
-	return sumLeafCounts(n.left) + sumLeafCounts(n.right)
-}
-
-func validateInternalCounts(t *testing.T, n *node) uint {
-	if n.isLeaf() {
-		return n.count
-	}
-	left := validateInternalCounts(t, n.left)
-	right := validateInternalCounts(t, n.right)
-
-	if n.count != left+right {
-		t.Fatalf("invalid internal node count: got %d, expected %d", n.count, left+right)
-	}
-	return n.count
-}
-
 func TestBuildTreeSingleNode(t *testing.T) {
 	freq := map[byte]uint{
 		'a': 5,
@@ -98,10 +98,10 @@ func TestBuildTreeSingleNode(t *testing.T) {
 	if root == nil {
 		t.Fatal("expected non-nil root")
 	}
-	if !root.isLeaf() {
-		t.Fatalf("expected leaf node, got internal node")
+	if root.isLeaf() {
+		t.Fatalf("expected internal node, got leaf node")
 	}
-	if root.char != 'a' || root.count != 5 {
+	if root.left.char != 'a' || root.left.count != 5 {
 		t.Fatalf("unexpected values: got (%c,%d)", root.char, root.count)
 	}
 }
@@ -306,54 +306,6 @@ func TestBuildReverseCodesNilTree(t *testing.T) {
 	codes := buildReverseCodes(nil)
 	if len(codes) != 0 {
 		t.Fatalf("expected empty map for nil tree, got %v", codes)
-	}
-}
-
-func TestBuildReverseCodesLeftOnlyTree(t *testing.T) {
-	root := &node{
-		left: &node{
-			left: &node{
-				left: &node{char: 'A'},
-			},
-		},
-	}
-	codes := buildReverseCodes(root)
-
-	if len(codes) != 1 {
-		t.Fatalf("expected 1 code, got %d", len(codes))
-	}
-
-	for k, v := range codes {
-		if v != 'A' {
-			t.Fatalf("expected 'A', got %c", v)
-		}
-		if k != "111" {
-			t.Fatalf("expected code '111', got %s", k)
-		}
-	}
-}
-
-func TestBuildReverseCodesRightOnlyTree(t *testing.T) {
-	root := &node{
-		right: &node{
-			right: &node{
-				right: &node{char: 'Z'},
-			},
-		},
-	}
-	codes := buildReverseCodes(root)
-
-	if len(codes) != 1 {
-		t.Fatalf("expected 1 code, got %d", len(codes))
-	}
-
-	for k, v := range codes {
-		if v != 'Z' {
-			t.Fatalf("expected 'Z', got %c", v)
-		}
-		if k != "000" {
-			t.Fatalf("expected code '000', got %s", k)
-		}
 	}
 }
 

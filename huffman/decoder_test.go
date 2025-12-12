@@ -1,141 +1,149 @@
 package huffman
 
-// import (
-// 	"bytes"
-// 	"testing"
+import (
+	"bytes"
+	"encoding/binary"
+	"io"
+	"testing"
 
-// 	"github.com/serrhiy/go-huffman/bitio"
-// )
+	"github.com/serrhiy/go-huffman/bitio"
+)
 
-// func TestReadTreeSingleLeaf(t *testing.T) {
-// 	buf := &bytes.Buffer{}
-// 	writer := bitio.NewWriter(buf)
-// 	writer.WriteBit(1)
-// 	writer.WriteByte('A')
-// 	writer.WriteByte('\n')
-// 	writer.Flush()
+func TestReadTreeSingleLeaf(t *testing.T) {
+	buf := &bytes.Buffer{}
+	writer := bitio.NewWriter(buf)
 
-// 	decoder := NewDecoder(buf, &bytes.Buffer{})
-// 	root, err := decoder.readTree()
-// 	if err != nil {
-// 		t.Fatalf("unexpected error: %v", err)
-// 	}
+	const size = 1 + 1 + 8
+	b := make([]byte, 2)
+	binary.LittleEndian.PutUint16(b, size)
 
-// 	if root == nil || !root.isLeaf() || root.char != 'A' {
-// 		t.Fatalf("expected leaf node 'A', got %+v", root)
-// 	}
-// }
+	writer.Write(b)
+	writer.WriteBit(0)
+	writer.WriteBit(1)
+	writer.WriteByte('A')
+	writer.Flush()
 
-// func TestReadTreeTwoLeaves(t *testing.T) {
-// 	buf := &bytes.Buffer{}
-// 	writer := bitio.NewWriter(buf)
+	decoder := NewDecoder(buf, &bytes.Buffer{})
+	root, err := decoder.readTree(bitio.NewReader(buf))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
-// 	writer.WriteBit(0)
-// 	writer.WriteBit(1)
-// 	writer.WriteByte('A')
-// 	writer.WriteBit(1)
-// 	writer.WriteByte('B')
-// 	writer.WriteByte('\n')
-// 	writer.Flush()
+	if root == nil || root.isLeaf() {
+		t.Fatalf("expected inner node, got %+v", root)
+	}
+	if root.left == nil || !root.left.isLeaf() || root.left.char != 'A' {
+		t.Fatalf("expected leaf node, got %+v", root.left)
+	}
+}
 
-// 	decoder := NewDecoder(buf, &bytes.Buffer{})
-// 	root, err := decoder.readTree()
-// 	if err != nil {
-// 		t.Fatalf("unexpected error: %v", err)
-// 	}
+func TestReadTreeTwoLeaves(t *testing.T) {
+	buf := &bytes.Buffer{}
+	writer := bitio.NewWriter(buf)
 
-// 	if root.isLeaf() {
-// 		t.Fatal("expected root to be internal node")
-// 	}
-// 	if root.left == nil || !root.left.isLeaf() || root.left.char != 'A' {
-// 		t.Fatalf("left child incorrect: %+v", root.left)
-// 	}
-// 	if root.right == nil || !root.right.isLeaf() || root.right.char != 'B' {
-// 		t.Fatalf("right child incorrect: %+v", root.right)
-// 	}
-// }
+	const size = 1 + 8 + 1 + 8 + 1
+	b := make([]byte, 2)
+	binary.LittleEndian.PutUint16(b, size)
 
-// func TestReadTreeEmptyInput(t *testing.T) {
-// 	decoder := NewDecoder(&bytes.Buffer{}, &bytes.Buffer{})
-// 	if _, err := decoder.readTree(); err != nil {
-// 		t.Fatalf("reading an empty file should not cause an error: %v", err)
-// 	}
-// }
+	writer.Write(b)
+	writer.WriteBit(0)
+	writer.WriteBit(1)
+	writer.WriteByte('A')
+	writer.WriteBit(1)
+	writer.WriteByte('B')
+	writer.Flush()
 
-// func TestReadTreeEmptyReaderError(t *testing.T) {
-// 	decoder := NewDecoder(&brokenReader{}, &bytes.Buffer{})
-// 	if _, err := decoder.readTree(); err == nil {
-// 		t.Fatal("expected read error")
-// 	}
-// }
+	decoder := NewDecoder(buf, &bytes.Buffer{})
+	root, err := decoder.readTree(bitio.NewReader(buf))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
-// func TestReadTreePartialEOF(t *testing.T) {
-// 	buf := &bytes.Buffer{}
-// 	writer := bitio.NewWriter(buf)
-// 	writer.WriteBit(0)
-// 	writer.WriteBit(1)
-// 	writer.WriteByte('A')
-// 	writer.WriteByte('\n')
-// 	writer.Flush()
+	if root.isLeaf() {
+		t.Fatal("expected root to be internal node")
+	}
+	if root.left == nil || !root.left.isLeaf() || root.left.char != 'A' {
+		t.Fatalf("left child incorrect: %+v", root.left)
+	}
+	if root.right == nil || !root.right.isLeaf() || root.right.char != 'B' {
+		t.Fatalf("right child incorrect: %+v", root.right)
+	}
+}
 
-// 	decoder := NewDecoder(buf, &bytes.Buffer{})
-// 	root, err := decoder.readTree()
-// 	if err != nil {
-// 		t.Fatalf("unexpected error: %v", err)
-// 	}
+func TestReadTreeEmptyInput(t *testing.T) {
+	decoder := NewDecoder(&bytes.Buffer{}, &bytes.Buffer{})
+	reader := bitio.NewReader(decoder.reader)
+	if _, err := decoder.readTree(reader); err != nil && err != io.EOF {
+		t.Fatalf("reading an empty file should not cause an error: %v", err)
+	}
+}
 
-// 	if root.left == nil || !root.left.isLeaf() || root.left.char != 'A' {
-// 		t.Fatalf("left child incorrect: %+v", root.left)
-// 	}
-// 	if root.right != nil {
-// 		t.Fatalf("expected nil right child, got %+v", root.right)
-// 	}
-// }
+func TestReadTreeEmptyReaderError(t *testing.T) {
+	decoder := NewDecoder(&brokenReader{}, &bytes.Buffer{})
+	reader := bitio.NewReader(decoder.reader)
+	if _, err := decoder.readTree(reader); err == nil {
+		t.Fatal("expected read error")
+	}
+}
 
-// func TestReadTreeLargeTree(t *testing.T) {
-// 	buf := &bytes.Buffer{}
-// 	writer := bitio.NewWriter(buf)
+func TestReadTreeLargeTree(t *testing.T) {
+	buf := &bytes.Buffer{}
+	writer := bitio.NewWriter(buf)
 
-// 	writer.WriteBit(0)
-// 	writer.WriteBit(0)
-// 	writer.WriteBit(1)
-// 	writer.WriteByte('A')
-// 	writer.WriteBit(1)
-// 	writer.WriteByte('B')
-// 	writer.WriteBit(1)
-// 	writer.WriteByte('C')
-// 	writer.WriteByte('\n')
-// 	writer.Flush()
+	const size = 29
 
-// 	decoder := NewDecoder(buf, &bytes.Buffer{})
-// 	root, err := decoder.readTree()
-// 	if err != nil {
-// 		t.Fatalf("unexpected error: %v", err)
-// 	}
+	b := make([]byte, 2)
+	binary.LittleEndian.PutUint16(b, size)
+	writer.Write(b)
 
-// 	if root.left == nil || root.right == nil {
-// 		t.Fatal("expected root to have two children")
-// 	}
-// 	if !root.left.left.isLeaf() || root.left.left.char != 'A' {
-// 		t.Fatalf("left-left incorrect: %+v", root.left.left)
-// 	}
-// 	if !root.left.right.isLeaf() || root.left.right.char != 'B' {
-// 		t.Fatalf("left-right incorrect: %+v", root.left.right)
-// 	}
-// 	if !root.right.isLeaf() || root.right.char != 'C' {
-// 		t.Fatalf("right incorrect: %+v", root.right)
-// 	}
-// }
+	// 		 (*)
+	// 		/   \
+	// 	(*)    C
+	// 	/   \
+	// A     B
 
-// func TestDecode_EmptyInputWritesNothing(t *testing.T) {
-// 	out := &bytes.Buffer{}
-// 	dec := NewDecoder(&bytes.Buffer{}, out)
+	writer.WriteBit(0)
+	writer.WriteBit(0)
+	writer.WriteBit(1)
+	writer.WriteByte('A')
+	writer.WriteBit(1)
+	writer.WriteByte('B')
+	writer.WriteBit(1)
+	writer.WriteByte('C')
 
-// 	if err := dec.Decode(); err != nil {
-// 		t.Fatalf("Decode failed: %v", err)
-// 	}
+	writer.Flush()
 
-// 	if out.Len() != 0 {
-// 		t.Fatalf("expected empty output, got %v bytes", out.Len())
-// 	}
-// }
+	decoder := NewDecoder(buf, &bytes.Buffer{})
+	reader := bitio.NewReader(buf)
+
+	root, err := decoder.readTree(reader)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if root.left == nil || root.right == nil {
+		t.Fatal("expected root to have two children")
+	}
+	if !root.left.left.isLeaf() || root.left.left.char != 'A' {
+		t.Fatalf("left-left incorrect: %+v", root.left.left)
+	}
+	if !root.left.right.isLeaf() || root.left.right.char != 'B' {
+		t.Fatalf("left-right incorrect: %+v", root.left.right)
+	}
+	if !root.right.isLeaf() || root.right.char != 'C' {
+		t.Fatalf("right incorrect: %+v", root.right)
+	}
+}
+
+func TestDecode_EmptyInputWritesNothing(t *testing.T) {
+	out := &bytes.Buffer{}
+	dec := NewDecoder(&bytes.Buffer{}, out)
+
+	if err := dec.Decode(); err != nil {
+		t.Fatalf("Decode failed: %v", err)
+	}
+
+	if out.Len() != 0 {
+		t.Fatalf("expected empty output, got %v bytes", out.Len())
+	}
+}

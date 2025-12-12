@@ -3,6 +3,7 @@ package huffman
 import (
 	"bufio"
 	"encoding/binary"
+	"errors"
 	"io"
 
 	"github.com/serrhiy/go-huffman/bitio"
@@ -21,12 +22,18 @@ func _readTree(reader *bitio.Reader, length uint16) (*node, error) {
 	var readed uint16 = 0
 	var next func() (*node, error)
 	next = func() (*node, error) {
+		if readed > length {
+			return nil, nil
+		}
 		bit, err := reader.ReadBit()
 		if err != nil {
 			return nil, err
 		}
 		readed += 1
 		if bit == 1 {
+			if readed+8 > length {
+				return nil, errors.New("invalid header structure")
+			}
 			b, err := reader.ReadByte()
 			if err != nil {
 				return nil, err
@@ -38,7 +45,7 @@ func _readTree(reader *bitio.Reader, length uint16) (*node, error) {
 		if err != nil {
 			return nil, err
 		}
-		if readed >= length {
+		if readed > length {
 			return &node{0, 0, left, nil}, nil
 		}
 
@@ -56,7 +63,6 @@ func (decoder *HuffmanDecoder) readTree(reader *bitio.Reader) (*node, error) {
 	if _, err := reader.Read(buffer); err != nil {
 		return nil, err
 	}
-
 	headerSize := binary.LittleEndian.Uint16(buffer)
 	return _readTree(reader, headerSize)
 }

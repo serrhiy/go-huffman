@@ -54,7 +54,7 @@ func (reader *Reader) Read(buffer []byte) (int, error) {
 			buffer[index] = b
 		}
 	}
-	return 0, nil
+	return len(buffer), nil
 }
 
 func (reader *Reader) Align() error {

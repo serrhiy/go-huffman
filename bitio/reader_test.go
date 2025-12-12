@@ -46,7 +46,7 @@ func TestReaderBitByBitFullByte(t *testing.T) {
 	}
 }
 
-func TestReaderReadUnaligned(t *testing.T) {
+func TestReaderReadByteUnaligned(t *testing.T) {
 	r := NewReader(bytes.NewBuffer([]byte{0b01010110, 0b10010110}))
 
 	r.ReadBit()
@@ -159,5 +159,83 @@ func TestReaderAlign(t *testing.T) {
 
 	if b != 0b11001100 {
 		t.Fatalf("expected 11001100, got %08b", b)
+	}
+}
+
+func TestReaderReadUnalignedEOF(t *testing.T) {
+	r := NewReader(bytes.NewBuffer([]byte{0b11110000}))
+
+	r.ReadBit()
+	r.ReadBit()
+
+	buf := make([]byte, 1)
+
+	if _, err := r.Read(buf); err != io.EOF {
+		t.Fatalf("expected EOF, got: %v", err)
+	}
+}
+
+func TestReaderReadUnaligned(t *testing.T) {
+	r := NewReader(bytes.NewBuffer([]byte{
+		0b10110010,
+		0b01011010,
+		0b01110011,
+	}))
+	r.ReadBit()
+	r.ReadBit()
+
+	buf := make([]byte, 2)
+	if _, err := r.Read(buf); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if buf[0] != 0b11001001 {
+		t.Fatalf("first bit is incorrect, expected: %d, got: %d", 0b11001001, buf[0])
+	}
+	if buf[1] != 0b01101001 {
+		t.Fatalf("first bit is incorrect, expected: %d, got: %d", 0b01101001, buf[1])
+	}
+}
+
+func TestReaderBitAfterUnalignedByte(t *testing.T) {
+	r := NewReader(bytes.NewBuffer([]byte{0b11001010, 0b10000000}))
+
+	r.ReadBit()
+	r.ReadBit()
+
+	b, _ := r.ReadByte()
+	if b != 0b00101010 {
+		t.Fatalf("unexpected byte: %08b", b)
+	}
+
+	bit, _ := r.ReadBit()
+	if bit != 0 {
+		t.Fatalf("expected next bit=0 got %d", bit)
+	}
+}
+
+func TestReaderReadZeroBytes(t *testing.T) {
+	r := NewReader(bytes.NewBuffer([]byte{0xAA}))
+
+	n, err := r.Read([]byte{})
+	if n != 0 || err != nil {
+		t.Fatalf("expected (0, nil), got (%d, %v)", n, err)
+	}
+}
+
+func TestReaderEmptyInput(t *testing.T) {
+	r := NewReader(bytes.NewBuffer(nil))
+
+	if _, err := r.ReadBit(); err != io.EOF {
+		t.Fatalf("expected EOF for ReadBit, got %v", err)
+	}
+
+	if _, err := r.ReadByte(); err != io.EOF {
+		t.Fatalf("expected EOF for ReadByte, got %v", err)
+	}
+
+	buf := make([]byte, 5)
+	n, err := r.Read(buf)
+	if n != 0 || err != io.EOF {
+		t.Fatalf("expected EOF for Read(), got (%d, %v)", n, err)
 	}
 }

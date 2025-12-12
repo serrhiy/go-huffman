@@ -1,299 +1,244 @@
 package huffman
 
-// import (
-// 	"bytes"
-// 	"errors"
-// 	"io"
-// 	"testing"
-// )
+import (
+	"bytes"
+	"encoding/binary"
+	"errors"
+	"io"
+	"testing"
+)
 
-// type brokenReader struct {
-// 	io.ReadSeeker
-// }
+func bitsNumberToBytesNumber(bits uint16) uint16 {
+	return (bits + 8 - bits%8) / 8
+}
 
-// func (b *brokenReader) Read([]byte) (int, error) {
-// 	return 0, errors.New("read error")
-// }
+type brokenReader struct {
+	io.ReadSeeker
+}
 
-// func (b *brokenReader) Seek(offset int64, whence int) (int64, error) {
-// 	return offset, nil
-// }
+func (b *brokenReader) Read([]byte) (int, error) {
+	return 0, errors.New("read error")
+}
 
-// func TestHuffmanEncoderGetFrequencyMap(t *testing.T) {
-// 	tests := []struct {
-// 		name     string
-// 		input    []byte
-// 		expected map[byte]uint
-// 	}{
-// 		{
-// 			name:  "simple text",
-// 			input: []byte("aabccc"),
-// 			expected: map[byte]uint{
-// 				'a': 2,
-// 				'b': 1,
-// 				'c': 3,
-// 			},
-// 		},
-// 		{
-// 			name:     "empty input",
-// 			input:    []byte{},
-// 			expected: map[byte]uint{},
-// 		},
-// 		{
-// 			name: "all bytes",
-// 			input: func() []byte {
-// 				data := make([]byte, 256)
-// 				for i := range 256 {
-// 					data[i] = byte(i)
-// 				}
-// 				return data
-// 			}(),
-// 			expected: func() map[byte]uint {
-// 				m := make(map[byte]uint)
-// 				for i := range 256 {
-// 					m[byte(i)] = 1
-// 				}
-// 				return m
-// 			}(),
-// 		},
-// 	}
+func (b *brokenReader) Seek(offset int64, whence int) (int64, error) {
+	return offset, nil
+}
 
-// 	for _, tc := range tests {
-// 		t.Run(tc.name, func(t *testing.T) {
-// 			reader := bytes.NewReader(tc.input)
-// 			writer := bytes.NewBuffer(nil)
+type failingWriter struct {
+	n int
+}
 
-// 			encoder := &HuffmanEncoder{
-// 				reader: reader,
-// 				writer: writer,
-// 			}
+func (fw *failingWriter) Write(p []byte) (int, error) {
+	if fw.n <= 0 {
+		return 0, errors.New("write failed")
+	}
+	if len(p) > fw.n {
+		p = p[:fw.n]
+	}
+	fw.n -= len(p)
+	return len(p), nil
+}
 
-// 			freq, err := encoder.getFrequencyMap()
-// 			if err != nil {
-// 				t.Fatalf("unexpected error: %v", err)
-// 			}
+func TestHuffmanEncoderGetFrequencyMap(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []byte
+		expected map[byte]uint
+	}{
+		{
+			name:  "simple text",
+			input: []byte("aabccc"),
+			expected: map[byte]uint{
+				'a': 2,
+				'b': 1,
+				'c': 3,
+			},
+		},
+		{
+			name:     "empty input",
+			input:    []byte{},
+			expected: map[byte]uint{},
+		},
+		{
+			name: "all bytes",
+			input: func() []byte {
+				data := make([]byte, 256)
+				for i := range 256 {
+					data[i] = byte(i)
+				}
+				return data
+			}(),
+			expected: func() map[byte]uint {
+				m := make(map[byte]uint)
+				for i := range 256 {
+					m[byte(i)] = 1
+				}
+				return m
+			}(),
+		},
+	}
 
-// 			if len(freq) != len(tc.expected) {
-// 				t.Fatalf("unexpected freq size: got %d, want %d", len(freq), len(tc.expected))
-// 			}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			reader := bytes.NewReader(tc.input)
+			writer := bytes.NewBuffer(nil)
 
-// 			for k, v := range tc.expected {
-// 				if freq[k] != v {
-// 					t.Fatalf("freq mismatch for '%c': got %d, want %d", k, freq[k], v)
-// 				}
-// 			}
-// 		})
-// 	}
-// }
+			encoder := &HuffmanEncoder{
+				reader: reader,
+				writer: writer,
+			}
 
-// func TestHuffmanEncoderGetFrequencyMapReadError(t *testing.T) {
-// 	reader := &brokenReader{
-// 		ReadSeeker: bytes.NewReader([]byte("abc")),
-// 	}
-// 	writer := bytes.NewBuffer(nil)
+			freq, err := encoder.getFrequencyMap()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 
-// 	encoder := &HuffmanEncoder{
-// 		reader: reader,
-// 		writer: writer,
-// 	}
+			if len(freq) != len(tc.expected) {
+				t.Fatalf("unexpected freq size: got %d, want %d", len(freq), len(tc.expected))
+			}
 
-// 	if _, err := encoder.getFrequencyMap(); err == nil {
-// 		t.Fatalf("expected read error, got nil")
-// 	}
-// }
+			for k, v := range tc.expected {
+				if freq[k] != v {
+					t.Fatalf("freq mismatch for '%c': got %d, want %d", k, freq[k], v)
+				}
+			}
+		})
+	}
+}
 
-// type failingWriter struct {
-// 	n int
-// }
+func TestHuffmanEncoderGetFrequencyMapReadError(t *testing.T) {
+	reader := &brokenReader{bytes.NewReader([]byte("abc"))}
+	encoder := NewEncoder(reader, nil)
+	if _, err := encoder.getFrequencyMap(); err == nil {
+		t.Fatalf("expected read error, got nil")
+	}
+}
 
-// func (fw *failingWriter) Write(p []byte) (int, error) {
-// 	if fw.n <= 0 {
-// 		return 0, errors.New("write failed")
-// 	}
-// 	if len(p) > fw.n {
-// 		p = p[:fw.n]
-// 	}
-// 	fw.n -= len(p)
-// 	return len(p), nil
-// }
+func TestWriteCodesSingleLeaf(t *testing.T) {
+	root := &node{
+		left: &node{
+			char:  'a',
+			count: 1,
+		},
+		right: nil,
+	}
 
-// func TestWriteCodesSingleLeaf(t *testing.T) {
-// 	root := &node{char: 'Z', count: 1}
+	buf := &bytes.Buffer{}
+	enc := NewEncoder(nil, buf)
 
-// 	buf := &bytes.Buffer{}
-// 	enc := NewEncoder(nil, buf)
+	if err := enc.writeCodes(root); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
-// 	if err := enc.writeCodes(root); err != nil {
-// 		t.Fatalf("unexpected error: %v", err)
-// 	}
+	out := buf.Bytes()
+	expectedLength := calculateTreeSize(root)
+	expexted := bitsNumberToBytesNumber(expectedLength) + 2
+	if len(out) != int(expexted) {
+		t.Fatalf("expected size %d, got %d", expexted, len(out))
+	}
+	actualLength := binary.LittleEndian.Uint16(out)
+	if expectedLength != actualLength {
+		t.Fatalf("expected header size: %d, got: %d", expectedLength, actualLength)
+	}
+}
 
-// 	out := buf.Bytes()
-// 	if len(out) < 2 {
-// 		t.Fatalf("expected at least 1 byte + newline, got: %v", out)
-// 	}
-// 	if out[len(out)-1] != '\n' {
-// 		t.Fatalf("expected newline, got %v", out)
-// 	}
-// }
+func TestWriteCodesSimpleTree(t *testing.T) {
+	root := &node{
+		left:  &node{char: 'A', count: 3},
+		right: &node{char: 'B', count: 5},
+	}
 
-// func TestWriteCodesSimpleTree(t *testing.T) {
-// 	root := &node{
-// 		left:  &node{char: 'A', count: 3},
-// 		right: &node{char: 'B', count: 5},
-// 	}
+	buf := &bytes.Buffer{}
+	enc := NewEncoder(nil, buf)
 
-// 	buf := &bytes.Buffer{}
-// 	enc := NewEncoder(nil, buf)
+	err := enc.writeCodes(root)
+	if err != nil {
+		t.Fatalf("writeCodes returned error: %v", err)
+	}
 
-// 	err := enc.writeCodes(root)
-// 	if err != nil {
-// 		t.Fatalf("writeCodes returned error: %v", err)
-// 	}
+	b := buf.Bytes()
+	if len(b) == 0 {
+		t.Fatalf("expected non empty result, got %v", b)
+	}
 
-// 	b := buf.Bytes()
-// 	if len(b) == 0 || b[len(b)-1] != '\n' {
-// 		t.Fatalf("expected ending newline, got %v", b)
-// 	}
+	expectedLength := calculateTreeSize(root)
+	actualLength := binary.LittleEndian.Uint16(b)
 
-// 	if len(b) <= 1 {
-// 		t.Fatalf("expected some bit-encoded data before newline")
-// 	}
-// }
+	if expectedLength != actualLength {
+		t.Fatalf("expected some bit-encoded data before newline")
+	}
+}
 
-// func TestWriteCodesWriterError(t *testing.T) {
-// 	root := &node{char: 'X', count: 1}
+func TestWriteCodesWriterError(t *testing.T) {
+	root := &node{char: 'X', count: 1}
 
-// 	fw := &failingWriter{n: 0}
-// 	enc := NewEncoder(nil, fw)
+	fw := &failingWriter{n: 0}
+	enc := NewEncoder(nil, fw)
 
-// 	err := enc.writeCodes(root)
-// 	if err == nil {
-// 		t.Fatalf("expected writer error")
-// 	}
-// }
+	err := enc.writeCodes(root)
+	if err == nil {
+		t.Fatalf("expected writer error")
+	}
+}
 
-// func TestWriteCodesAlignCalled(t *testing.T) {
-// 	root := &node{
-// 		left:  &node{char: 'A', count: 1},
-// 		right: &node{char: 'B', count: 2},
-// 	}
+func TestEncodeContentSingleByte(t *testing.T) {
+	reader := bytes.NewReader([]byte{'A'})
+	writer := &bytes.Buffer{}
+	enc := NewEncoder(reader, writer)
+	codes := map[byte]string{'a': "1"}
+	size, _ := calculateContentSize(codes, map[byte]uint{'a': 1})
 
-// 	buf := &bytes.Buffer{}
-// 	enc := NewEncoder(nil, buf)
+	if err := enc.encodeContent(codes, size); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
-// 	err := enc.writeCodes(root)
-// 	if err != nil {
-// 		t.Fatalf("writeCodes error: %v", err)
-// 	}
+	data := writer.Bytes()
+	if actualSize := binary.LittleEndian.Uint64(data); actualSize != size {
+		t.Fatalf("invalid content size, expected %d, got %d", size, actualSize)
+	}
+}
 
-// 	out := buf.Bytes()
+func TestEncodeContentMultipleBytes(t *testing.T) {
+	reader := bytes.NewReader([]byte{'a', 'b', 'a'})
+	writer := &bytes.Buffer{}
+	enc := NewEncoder(reader, writer)
 
-// 	if len(out) < 2 {
-// 		t.Fatalf("expected data + newline, got too short: %v", out)
-// 	}
+	codes := map[byte]string{'a': "0", 'b': "1"}
+	frequencies := map[byte]uint{'A': 2, 'B': 1}
+	size, _ := calculateContentSize(codes, frequencies)
 
-// 	if out[len(out)-1] != '\n' {
-// 		t.Fatalf("expected newline, got: %v", out)
-// 	}
-// }
+	if err := enc.encodeContent(codes, size); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
-// // func TestEncodeContentSingleByte(t *testing.T) {
-// // 	reader := bytes.NewReader([]byte{'A'})
-// // 	writer := &bytes.Buffer{}
-// // 	enc := NewEncoder(reader, writer)
+	data := writer.Bytes()
+	if len(data) == 0 {
+		t.Fatal("expected some bytes to be written")
+	}
+}
 
-// // 	codes := map[byte]string{'A': "101"}
-// // 	if err := enc.encodeContent(codes); err != nil {
-// // 		t.Fatalf("unexpected error: %v", err)
-// // 	}
+func TestEncodeContentVariedBitLengths(t *testing.T) {
+	reader := bytes.NewReader([]byte{'a', 'b', 'c'})
+	writer := &bytes.Buffer{}
+	enc := NewEncoder(reader, writer)
 
-// // 	data := writer.Bytes()
-// // 	if len(data) == 0 {
-// // 		t.Fatal("expected some bytes to be written")
-// // 	}
-// // }
+	codes := map[byte]string{'A': "1", 'B': "01", 'C': "001"}
 
-// // func TestEncodeContentMultipleBytes(t *testing.T) {
-// // 	reader := bytes.NewReader([]byte{'A', 'B', 'A'})
-// // 	writer := &bytes.Buffer{}
-// // 	enc := NewEncoder(reader, writer)
+	if err := enc.encodeContent(codes, 1+2+3); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
-// // 	codes := map[byte]string{
-// // 		'A': "0",
-// // 		'B': "11",
-// // 	}
+	if writer.Len() == 0 {
+		t.Fatal("expected data to be written")
+	}
+}
 
-// // 	if err := enc.encodeContent(codes); err != nil {
-// // 		t.Fatalf("unexpected error: %v", err)
-// // 	}
+func TestEncodeContentWriterError(t *testing.T) {
+	reader := bytes.NewReader([]byte{'A'})
+	enc := NewEncoder(reader, &failingWriter{})
 
-// // 	data := writer.Bytes()
-// // 	if len(data) == 0 {
-// // 		t.Fatal("expected some bytes to be written")
-// // 	}
-// // }
-
-// // func TestEncodeContentVariedBitLengths(t *testing.T) {
-// // 	reader := bytes.NewReader([]byte{'A', 'B', 'C'})
-// // 	writer := &bytes.Buffer{}
-// // 	enc := NewEncoder(reader, writer)
-
-// // 	codes := map[byte]string{
-// // 		'A': "1",
-// // 		'B': "01",
-// // 		'C': "001",
-// // 	}
-
-// // 	if err := enc.encodeContent(codes); err != nil {
-// // 		t.Fatalf("unexpected error: %v", err)
-// // 	}
-
-// // 	if writer.Len() == 0 {
-// // 		t.Fatal("expected data to be written")
-// // 	}
-// // }
-
-// // func TestEncodeContentWriterError(t *testing.T) {
-// // 	reader := bytes.NewReader([]byte{'A'})
-// // 	enc := NewEncoder(reader, &failingWriter{})
-
-// // 	codes := map[byte]string{'A': "1"}
-// // 	if err := enc.encodeContent(codes); err == nil {
-// // 		t.Fatal("expected write error, got nil")
-// // 	}
-// // }
-
-// // func TestEncodeContentReaderError(t *testing.T) {
-// // 	enc := NewEncoder(&brokenReader{}, &bytes.Buffer{})
-
-// // 	codes := map[byte]string{'A': "1"}
-// // 	err := enc.encodeContent(codes)
-// // 	if err == nil {
-// // 		t.Fatalf("expected nil because encodeContent ignores non-EOF read errors, got %v", err)
-// // 	}
-// // }
-
-// // func TestEncodeContentBitPattern(t *testing.T) {
-// // 	data := []byte{'A', 'B'}
-// // 	reader := bytes.NewReader(data)
-// // 	writer := &bytes.Buffer{}
-// // 	enc := NewEncoder(reader, writer)
-
-// // 	codes := map[byte]string{
-// // 		'A': "10",
-// // 		'B': "01",
-// // 	}
-
-// // 	if err := enc.encodeContent(codes); err != nil {
-// // 		t.Fatalf("unexpected error: %v", err)
-// // 	}
-
-// // 	out := writer.Bytes()
-// // 	if len(out) == 0 {
-// // 		t.Fatal("expected bytes written")
-// // 	}
-
-// // 	if out[0] != 0 && out[0] != 128 {
-// // 		t.Logf("first byte: %08b", out[0])
-// // 	}
-// // }
+	codes := map[byte]string{'A': "1"}
+	if err := enc.encodeContent(codes, 1); err == nil {
+		t.Fatal("expected write error, got nil")
+	}
+}

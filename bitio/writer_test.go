@@ -149,6 +149,9 @@ func TestWriteBits(t *testing.T) {
 		buf := &bytes.Buffer{}
 		w := NewWriter(buf)
 		w.WriteBits(0b10010101, 1)
+		if w.cacheSize != 1 {
+			t.Fatalf("invalid cache sizw after writing 1 byte, expected 1, got: %d", w.cacheSize)
+		}
 		w.Flush()
 		if buf.Bytes()[0] != (1 << 7) {
 			t.Fatalf("invalid bit writed, expected: 1, got: 0")
@@ -288,6 +291,17 @@ func TestWriteBit(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestFlush(t *testing.T) {
+	t.Run("empty flush", func(t *testing.T) {
+		w := NewWriter(nil)
+		if err := w.Flush(); err != nil {
+			t.Fatalf("unexpected error while flusing empty buffer: %v", err)
+		}
+	})
+
+	// Other cases are tested in TestWrite*
 }
 
 func TestWriterBasic(t *testing.T) {

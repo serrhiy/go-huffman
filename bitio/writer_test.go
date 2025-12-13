@@ -304,6 +304,76 @@ func TestFlush(t *testing.T) {
 	// Other cases are tested in TestWrite*
 }
 
+func TestWriterAlign(t *testing.T) {
+	t.Run("empty align", func(t *testing.T) {
+		w := NewWriter(nil)
+		if err := w.Align(); err != nil {
+			t.Fatalf("unexpected error while aligning empty buffer: %v", err)
+		}
+	})
+
+	t.Run("align aligned byte", func(t *testing.T) {
+		buf := &bytes.Buffer{}
+		w := NewWriter(buf)
+		w.WriteByte(0xff)
+		if err := w.Align(); err != nil {
+			t.Fatalf("unexpected error while aligning: %v", err)
+		}
+	})
+
+	t.Run("standart case", func(t *testing.T) {
+		const expected = 0b11100000
+		buf := &bytes.Buffer{}
+		w := NewWriter(buf)
+
+		w.WriteBits(expected, 3)
+
+		if err := w.Align(); err != nil {
+			t.Fatalf("unexpected error while aligning: %v", err)
+		}
+		if err := w.Flush(); err != nil {
+			t.Fatalf("unexpected wrror while flushing: %v", err)
+		}
+		if len(buf.Bytes()) != 1 {
+			t.Fatalf("expected 1 byte after align, got %d", len(buf.Bytes()))
+		}
+
+		got := buf.Bytes()[0]
+		if got != expected {
+			t.Fatalf("expected %#08b got %#08b", expected, got)
+		}
+		if w.cacheSize != 0 {
+			t.Fatalf("expected cacheSize=0 got %d", w.cacheSize)
+		}
+	})
+
+	t.Run("variable cache sizes", func(t *testing.T) {
+		for bits := byte(1); bits < 8; bits++ {
+			buf := &bytes.Buffer{}
+			w := NewWriter(buf)
+
+			w.WriteBits(0xFF, bits)
+
+			if err := w.Align(); err != nil {
+				t.Fatalf("Align failed for bits=%d: %v", bits, err)
+			}
+			if err := w.Flush(); err != nil {
+				t.Fatalf("Flush failes: %v", err)
+			}
+			if len(buf.Bytes()) != 1 {
+				t.Fatalf("expected 1 byte for bits=%d got %d bytes", bits, len(buf.Bytes()))
+			}
+
+			result := buf.Bytes()[0]
+			expected := byte(((1 << bits) - 1) << (8 - bits))
+
+			if result != expected {
+				t.Fatalf("invalid bit value: %d, expected: %d", result, expected)
+			}
+		}
+	})
+}
+
 func TestWriterBasic(t *testing.T) {
 	buf := &bytes.Buffer{}
 	w := NewWriter(buf)

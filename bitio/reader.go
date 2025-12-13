@@ -2,6 +2,7 @@ package bitio
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 )
 
@@ -64,4 +65,19 @@ func (reader *Reader) Align() error {
 		}
 	}
 	return nil
+}
+
+func (reader *Reader) ReadBits(number byte) (byte, error) {
+	if number > 8 {
+		return 0, fmt.Errorf("invalid number of bytes to read: %d", number)
+	}
+	var result byte = 0
+	for i := range number {
+		bit, err := reader.ReadBit()
+		if err != nil {
+			return result, err
+		}
+		result |= bit << (7 - i)
+	}
+	return result, nil
 }

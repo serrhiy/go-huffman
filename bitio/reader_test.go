@@ -6,6 +6,51 @@ import (
 	"testing"
 )
 
+func TestReadByte(t *testing.T) {
+	t.Run("empty buffer", func(t *testing.T) {
+		r := NewReader(bytes.NewBuffer([]byte{}))
+		if _, err := r.ReadByte(); err != io.EOF {
+			t.Fatalf("error expected while reading empty buffer, got: %v", err)
+		}
+	})
+
+	t.Run("read 1 byte", func(t *testing.T) {
+		r := NewReader(bytes.NewBuffer([]byte{0xff}))
+		res, err := r.ReadByte()
+		if err != nil {
+			t.Fatalf("unexpected error while reding byte: %v", err)
+		}
+		if res != 0xff {
+			t.Fatalf("invalid byte readed, expected: %d, got: %d", 0xff, res)
+		}
+	})
+
+	t.Run("read several bytes", func(t *testing.T) {
+		source := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9}
+		r := NewReader(bytes.NewBuffer(source))
+		buffer := make([]byte, 0, len(source))
+		for len(buffer) < len(source) {
+			res, err := r.ReadByte()
+			if err != nil {
+				t.Fatalf("unxepexted error while reading byte: %v", err)
+			}
+			buffer = append(buffer, res)
+		}
+		if !bytes.Equal(source, buffer) {
+			t.Fatalf("original and read buffers do not match: expexted: %v, got: %v", source, buffer)
+		}
+	})
+
+	t.Run("EOF after reading whole buffer", func(t *testing.T) {
+		r := NewReader(bytes.NewBuffer([]byte{1, 2}))
+		r.ReadByte()
+		r.ReadByte()
+		if _, err := r.ReadByte(); err != io.EOF {
+			t.Fatalf("EOF expected after reading whole buffer: %v", err)
+		}
+	})
+}
+
 func TestRead(t *testing.T) {
 	t.Run("empty buffer", func(t *testing.T) {
 		r := NewReader(bytes.NewBuffer([]byte{}))

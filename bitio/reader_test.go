@@ -394,14 +394,103 @@ func TestAlign(t *testing.T) {
 	t.Run("align different size", func(t *testing.T) {
 		for i := range 8 {
 			r := NewReader(bytes.NewBuffer([]byte{0xff}))
-			for range i {
-				r.ReadBit()
-			}
+			r.ReadBits(byte(i))
 			if err := r.Align(); err != nil {
 				t.Fatalf("unexpected error while aligning after reading %d bits: %v", i, err)
 			}
 			if r.cache != 0 || r.cacheSize != 0 {
 				t.Fatalf("cache and cache size should be empty after aligning, cache: %d, cache size: %d", r.cache, r.cacheSize)
+			}
+		}
+	})
+}
+
+func TestCombinations(t *testing.T) {
+	t.Run("byte reading after reading bits", func(t *testing.T) {
+		r := NewReader(bytes.NewBuffer([]byte{0b01000011, 0b10100011}))
+
+		r.ReadBit()
+		r.ReadBit()
+		r.ReadBit()
+
+		res, err := r.ReadByte()
+		if err != nil {
+			t.Fatalf("error while reading byte: %v", err)
+		}
+		if res != 0b00011101 {
+			t.Fatalf("invalid byte readed, expected: %#b, got: %#b", 0b00011101, res)
+		}
+		for range 3 {
+			if bit, err := r.ReadBit(); err != nil || bit != 0 {
+				t.Fatalf("error while reading bit: %#b, %v", bit, err)
+			}
+		}
+		for range 2 {
+			if bit, err := r.ReadBit(); err != nil || bit != 1 {
+				t.Fatalf("error while reading bit: %#b, %v", bit, err)
+			}
+		}
+		if _, err := r.ReadBit(); err != io.EOF {
+			t.Fatalf("eof expected after reding all bits, got: %v", err)
+		}
+	})
+
+	t.Run("bytes reading after reading bits", func(t *testing.T) {
+		source := []byte{0b01000011, 0b10100011, 0b00110110, 0b01011111}
+		r := NewReader(bytes.NewBuffer(source))
+
+		r.ReadBit()
+		r.ReadBit()
+		r.ReadBit()
+		r.ReadBit()
+
+		buffer := make([]byte, 3)
+		if _, err := r.Read(buffer); err != nil {
+			t.Fatalf("unexpected error whle reading bytes: %v", err)
+		}
+
+		expected := []byte{0b00111010, 0b00110011, 0b01100101}
+		if !bytes.Equal(expected, buffer) {
+			t.Fatalf("invalid bytes readed, expected: %v, got: %v", expected, buffer)
+		}
+
+		if r.cache != 0b11110000 || r.cacheSize != 4 {
+			t.Fatalf("invalud cache or cache size values, cache: %#b, %d", r.cache, r.cacheSize)
+		}
+
+		for range 4 {
+			if bit, err := r.ReadBit(); err != nil || bit != 1 {
+				t.Fatalf("error while reading bit: %#b, %v", bit, err)
+			}
+		}
+
+		if _, err := r.ReadBit(); err != io.EOF {
+			t.Fatalf("eof expected after reding all bits, got: %v", err)
+		}
+	})
+
+	t.Run("ReadBits + ReadBit", func(t *testing.T) {
+		// brute force
+		for k := range 255 {
+			expected := byte(k)
+			for i := range 8 {
+				r := NewReader(bytes.NewBuffer([]byte{expected}))
+				mask := byte(((1 << i) - 1) << (8 - i))
+				if bits, _ := r.ReadBits(byte(i)); bits != expected&mask {
+					t.Fatalf("invalid bits, expected: %#08b, got: %#08b", expected&mask, bits)
+				}
+				mask = (^mask) << i
+				var result byte = 0
+				for j := i + 1; j <= 8; j++ {
+					bit, err := r.ReadBit()
+					if err != nil {
+						t.Fatalf("unexpected error occured while reading bit: %v", err)
+					}
+					result |= bit << (8 - j + i)
+				}
+				if result != (expected<<i)&mask {
+					t.Fatalf("invalid bits, expected: %#08b, got: %#08b", (expected<<i)&mask, result)
+				}
 			}
 		}
 	})

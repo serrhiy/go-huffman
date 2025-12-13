@@ -223,6 +223,73 @@ func TestWriteBits(t *testing.T) {
 	})
 }
 
+func TestWriteBit(t *testing.T) {
+	t.Run("write 1 bit(bit = 1)", func(t *testing.T) {
+		buf := &bytes.Buffer{}
+		w := NewWriter(buf)
+		w.WriteBit(1)
+		w.Flush()
+		if buf.Bytes()[0] != (1 << 7) {
+			t.Fatalf("invalid bit writed, expected: 1, got: 0")
+		}
+	})
+
+	t.Run("write 1 bit(bit = 0)", func(t *testing.T) {
+		buf := &bytes.Buffer{}
+		w := NewWriter(buf)
+		w.WriteBit(0)
+		w.Flush()
+		if buf.Bytes()[0] != 0 {
+			t.Fatalf("invalid bit writed, expected: 0, got: 1")
+		}
+	})
+
+	t.Run("error propagation", func(t *testing.T) {
+		w := NewWriter(&errWriter{1})
+		for range 8 {
+			w.WriteBit(1)
+		}
+		if err := w.Flush(); err != nil {
+			t.Fatalf("unexpexted error while flushing: %v", err)
+		}
+		w.WriteBit(1)
+		if err := w.Flush(); err == nil {
+			t.Fatal("expected error but got <nil>")
+		}
+	})
+
+	t.Run("write whole byte", func(t *testing.T) {
+		tests := []struct {
+			bits []byte
+			want byte
+		}{
+			{[]byte{0, 0, 0, 0, 0, 0, 0, 0}, 0x00},
+			{[]byte{1, 1, 1, 1, 1, 1, 1, 1}, 0xFF},
+			{[]byte{1, 0, 1, 0, 1, 0, 1, 0}, 0xAA},
+			{[]byte{0, 1, 0, 1, 0, 1, 0, 1}, 0x55},
+		}
+
+		for _, tc := range tests {
+			buf := &bytes.Buffer{}
+			w := NewWriter(buf)
+
+			for _, b := range tc.bits {
+				if err := w.WriteBit(b); err != nil {
+					t.Fatalf("write error: %v", err)
+				}
+			}
+
+			if err := w.Flush(); err != nil {
+				t.Fatalf("flush error: %v", err)
+			}
+
+			if buf.Bytes()[0] != tc.want {
+				t.Fatalf("expected %#08b got %#08b", tc.want, buf.Bytes()[0])
+			}
+		}
+	})
+}
+
 func TestWriterBasic(t *testing.T) {
 	buf := &bytes.Buffer{}
 	w := NewWriter(buf)
@@ -247,37 +314,6 @@ func TestWriterBasic(t *testing.T) {
 
 	if out := buf.Bytes(); len(out) == 0 {
 		t.Fatalf("writer produced no output")
-	}
-}
-
-func TestWriteBitPatterns(t *testing.T) {
-	tests := []struct {
-		bits []byte
-		want byte
-	}{
-		{[]byte{0, 0, 0, 0, 0, 0, 0, 0}, 0x00},
-		{[]byte{1, 1, 1, 1, 1, 1, 1, 1}, 0xFF},
-		{[]byte{1, 0, 1, 0, 1, 0, 1, 0}, 0xAA},
-		{[]byte{0, 1, 0, 1, 0, 1, 0, 1}, 0x55},
-	}
-
-	for _, tc := range tests {
-		buf := &bytes.Buffer{}
-		w := NewWriter(buf)
-
-		for _, b := range tc.bits {
-			if err := w.WriteBit(b); err != nil {
-				t.Fatalf("write error: %v", err)
-			}
-		}
-
-		if err := w.Flush(); err != nil {
-			t.Fatalf("flush error: %v", err)
-		}
-
-		if buf.Bytes()[0] != tc.want {
-			t.Fatalf("expected %08b got %08b", tc.want, buf.Bytes()[0])
-		}
 	}
 }
 

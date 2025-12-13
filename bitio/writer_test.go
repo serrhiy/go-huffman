@@ -85,6 +85,65 @@ func TestWriteByte(t *testing.T) {
 	})
 }
 
+func TestWrite(t *testing.T) {
+	t.Run("write 1 byte", func(t *testing.T) {
+		buf := &bytes.Buffer{}
+		w := NewWriter(buf)
+		w.Write([]byte{0xff})
+		w.Flush()
+		if buf.Len() != 1 || buf.Bytes()[0] != 0xff {
+			t.Fatalf("invalud byte writed, expected: [0xff], got: %v", buf.Bytes())
+		}
+	})
+
+	t.Run("write whole buffer", func(t *testing.T) {
+		source := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9}
+		buf := &bytes.Buffer{}
+		w := NewWriter(buf)
+		if _, err := w.Write(source); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if err := w.Flush(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !bytes.Equal(buf.Bytes(), source) {
+			t.Fatalf("invalid bytes writed to buffer, expected: %v, got: %v", source, buf.Bytes())
+		}
+	})
+
+	t.Run("write chunks", func(t *testing.T) {
+		source := [][]byte{
+			{1, 2, 3, 4},
+			{5, 6, 7, 8},
+			{9, 10, 11, 12},
+		}
+		buf := &bytes.Buffer{}
+		w := NewWriter(buf)
+		flatten := make([]byte, 0, len(source)*len(source[0]))
+		for _, chunk := range source {
+			if _, err := w.Write(chunk); err != nil {
+				t.Fatalf("unexpexted error while writing chunk: %v", err)
+			}
+			flatten = append(flatten, chunk...)
+		}
+		if err := w.Flush(); err != nil {
+			t.Fatalf("unexpexed error while flushing: %v", err)
+		}
+		if !bytes.Equal(flatten, buf.Bytes()) {
+			t.Fatalf("invalid bytes writed, expected: %v, got: %v", flatten, buf.Bytes())
+		}
+	})
+
+	t.Run("error propagation", func(t *testing.T) {
+		source := []byte{9: 0xff}
+		w := NewWriter(&errWriter{9})
+		w.Write(source)
+		if err := w.Flush(); err == nil {
+			t.Fatalf("error expected, got: <nil>")
+		}
+	})
+}
+
 func TestWriterBasic(t *testing.T) {
 	buf := &bytes.Buffer{}
 	w := NewWriter(buf)

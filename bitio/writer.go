@@ -2,6 +2,7 @@ package bitio
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 )
 
@@ -41,6 +42,10 @@ func (writer *Writer) WriteByte(b byte) error {
 }
 
 func (writer *Writer) WriteBits(bits byte, n byte) (err error) {
+	if n > 8 {
+		return fmt.Errorf("invalid bytes number: %d", n)
+	}
+
 	bits &= ((1 << n) - 1) << (8 - n)
 
 	if writer.cacheSize+n < 8 {

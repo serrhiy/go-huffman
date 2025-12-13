@@ -144,6 +144,85 @@ func TestWrite(t *testing.T) {
 	})
 }
 
+func TestWriteBits(t *testing.T) {
+	t.Run("write 1 bit(bit = 1)", func(t *testing.T) {
+		buf := &bytes.Buffer{}
+		w := NewWriter(buf)
+		w.WriteBits(0b10010101, 1)
+		w.Flush()
+		if buf.Bytes()[0] != (1 << 7) {
+			t.Fatalf("invalid bit writed, expected: 1, got: 0")
+		}
+	})
+
+	t.Run("write 1 bit(bit = 0)", func(t *testing.T) {
+		buf := &bytes.Buffer{}
+		w := NewWriter(buf)
+		w.WriteBits(0, 1)
+		w.Flush()
+		if buf.Bytes()[0] != 0 {
+			t.Fatalf("invalid bit writed, expected: 0, got: 1")
+		}
+	})
+
+	t.Run("write whole byte", func(t *testing.T) {
+		const expected = 0b1100010
+		buf := &bytes.Buffer{}
+		w := NewWriter(buf)
+		w.WriteBits(expected, 8)
+		if err := w.Flush(); err != nil {
+			t.Fatalf("unexpexted error whiule writing bits: %v", err)
+		}
+		if buf.Bytes()[0] != expected {
+			t.Fatalf("invalid bits writed, expected: %#08b, got: %#08b", expected, buf.Bytes()[0])
+		}
+	})
+
+	t.Run("write zero bytes", func(t *testing.T) {
+		buf := &bytes.Buffer{}
+		w := NewWriter(buf)
+		w.WriteBits(0xff, 0)
+		w.Flush()
+		if buf.Len() > 0 {
+			t.Fatalf("invalid buffer length when writing 0 bits, expected: 0, got: %d", buf.Len())
+		}
+	})
+
+	t.Run("invalud bytes length", func(t *testing.T) {
+		buf := &bytes.Buffer{}
+		w := NewWriter(buf)
+		if err := w.WriteBits(0xff, 9); err == nil {
+			t.Fatal("expexted error when writing 9 bits to byte, got <nil>")
+		}
+	})
+
+	t.Run("write part of byte", func(t *testing.T) {
+		// brute force
+		for i := range 256 {
+			expected := byte(i)
+			for j := range 9 {
+				buf := &bytes.Buffer{}
+				w := NewWriter(buf)
+				w.WriteBits(expected, byte(j))
+				if err := w.Flush(); err != nil {
+					t.Fatalf("unexpected error while writing bits: %v", err)
+				}
+				if j == 0 {
+					if buf.Len() != 0 {
+						t.Fatalf("invalid buffer length when writing 0 bits, expected: 0, got: %d", buf.Len())
+					}
+					continue
+				}
+				mask := byte(((1 << j) - 1) << (8 - j))
+				result := buf.Bytes()[0]
+				if (expected & mask) != result {
+					t.Fatalf("invalid bytes writed: expected: %d, got: %d", (expected & mask), result)
+				}
+			}
+		}
+	})
+}
+
 func TestWriterBasic(t *testing.T) {
 	buf := &bytes.Buffer{}
 	w := NewWriter(buf)

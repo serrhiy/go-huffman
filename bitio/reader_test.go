@@ -371,3 +371,38 @@ func TestRead(t *testing.T) {
 		}
 	})
 }
+
+func TestAlign(t *testing.T) {
+	t.Run("empty buffer", func(t *testing.T) {
+		r := NewReader(bytes.NewBuffer([]byte{}))
+		if err := r.Align(); err != nil {
+			t.Fatalf("unexpected error while aligning empty buffer: %v", err)
+		}
+	})
+
+	t.Run("align after reading 1 bit", func(t *testing.T) {
+		r := NewReader(bytes.NewBuffer([]byte{0xff}))
+		r.ReadBit()
+		if err := r.Align(); err != nil {
+			t.Fatalf("unexpected error while aligning: %v", err)
+		}
+		if r.cache != 0 || r.cacheSize != 0 {
+			t.Fatalf("cache and cache size should be empty after aligning, cache: %d, cache size: %d", r.cache, r.cacheSize)
+		}
+	})
+
+	t.Run("align different size", func(t *testing.T) {
+		for i := range 8 {
+			r := NewReader(bytes.NewBuffer([]byte{0xff}))
+			for range i {
+				r.ReadBit()
+			}
+			if err := r.Align(); err != nil {
+				t.Fatalf("unexpected error while aligning after reading %d bits: %v", i, err)
+			}
+			if r.cache != 0 || r.cacheSize != 0 {
+				t.Fatalf("cache and cache size should be empty after aligning, cache: %d, cache size: %d", r.cache, r.cacheSize)
+			}
+		}
+	})
+}

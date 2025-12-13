@@ -51,6 +51,114 @@ func TestReadByte(t *testing.T) {
 	})
 }
 
+func TestReadBits(t *testing.T) {
+	t.Run("empty buffer", func(t *testing.T) {
+		r := NewReader(bytes.NewBuffer([]byte{}))
+		if res, err := r.ReadBits(1); err != io.EOF {
+			t.Fatalf("EOF error expected, got: %d, %v", res, err)
+		}
+	})
+
+	t.Run("read 0 bits", func(t *testing.T) {
+		r := NewReader(bytes.NewBuffer([]byte{1, 2, 3}))
+		res, err := r.ReadBits(0)
+		if err != nil {
+			t.Fatalf("unexpected error while reading 0 bits: %v", err)
+		}
+		if res != 0 {
+			t.Fatalf("invalid result after reading 0 bits: %d", res)
+		}
+	})
+
+	t.Run("invalid number of bytes to read", func(t *testing.T) {
+		r := NewReader(bytes.NewBuffer([]byte{1, 2, 3}))
+		if _, err := r.ReadBits(9); err == nil {
+			t.Fatal("no error when reading > 8 bits")
+		}
+	})
+
+	t.Run("EOF", func(t *testing.T) {
+		r := NewReader(bytes.NewBuffer([]byte{0b11001010}))
+		r.ReadBit()
+		_, err := r.ReadBits(8)
+		if err != io.EOF {
+			t.Fatalf("expected EOF but got: %v", err)
+		}
+	})
+
+	t.Run("reading 1 bit(bit = 1)", func(t *testing.T) {
+		r := NewReader(bytes.NewBuffer([]byte{0b11001010}))
+		res, err := r.ReadBits(1)
+		if err != nil {
+			t.Fatalf("unexpexted error while reading 1 bit: %v", err)
+		}
+		if res != 1<<7 {
+			t.Fatalf("nvalid reasult of reading 1 bit, expected: %d, got: %d", 1<<7, res)
+		}
+	})
+
+	t.Run("reading 1 bit(bit = 0)", func(t *testing.T) {
+		r := NewReader(bytes.NewBuffer([]byte{0b01001010}))
+		res, err := r.ReadBits(1)
+		if err != nil {
+			t.Fatalf("unexpexted error while reading 1 bit: %v", err)
+		}
+		if res != 0 {
+			t.Fatalf("invalid reasult of reading 1 bit, expected: %d, got: %d", 0, res)
+		}
+	})
+
+	t.Run("reading 8 bits", func(t *testing.T) {
+		const expected = 0b01001010
+		r := NewReader(bytes.NewBuffer([]byte{0b01001010}))
+		res, err := r.ReadBits(8)
+		if err != nil {
+			t.Fatalf("unexpected error while reading 8 bits: %v", err)
+		}
+		if res != expected {
+			t.Fatalf("invalid reasult of reading 8 bits, expected: %d, got: %d", expected, res)
+		}
+	})
+
+	t.Run("reading several bits inside byte", func(t *testing.T) {
+		r := NewReader(bytes.NewBuffer([]byte{0b01001010}))
+		res, err := r.ReadBits(3)
+		if err != nil {
+			t.Fatalf("unexpexted error while reading bits: %v", err)
+		}
+		if (res & 0b11100000) != 0b01000000 {
+			t.Fatalf("invalud reading result, expected: %d, got: %d", 0b01000000, res)
+		}
+		res, err = r.ReadBits(5)
+		if err != nil {
+			t.Fatalf("unexpexted error while reading bits: %v", err)
+		}
+		if (res & 0b11111000) != 0b01010000 {
+			t.Fatalf("invalud reading result, expected: %d, got: %d", 0b01010000, res)
+		}
+
+		if r.cache != 0 {
+			t.Fatalf("invalid cache value, expected: 0, result: %d", r.cache)
+		}
+
+		if r.cacheSize != 0 {
+			t.Fatalf("invalid cache size value, expected: 0, result: %d", r.cacheSize)
+		}
+	})
+
+	t.Run("read bits across boundary", func(t *testing.T) {
+		r := NewReader(bytes.NewBuffer([]byte{0b01001010, 0b10100101}))
+		r.ReadBits(5)
+		res, err := r.ReadBits(8)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if res != 0b01010100 {
+			t.Fatalf("invaliud result value, expected: %v, got: %v", 0b01010100, res)
+		}
+	})
+}
+
 func TestRead(t *testing.T) {
 	t.Run("empty buffer", func(t *testing.T) {
 		r := NewReader(bytes.NewBuffer([]byte{}))
@@ -406,110 +514,3 @@ func TestReaderAlignOnBoundary(t *testing.T) {
 	}
 }
 
-func TestReadBits(t *testing.T) {
-	t.Run("empty buffer", func(t *testing.T) {
-		r := NewReader(bytes.NewBuffer([]byte{}))
-		if res, err := r.ReadBits(1); err != io.EOF {
-			t.Fatalf("EOF error expected, got: %d, %v", res, err)
-		}
-	})
-
-	t.Run("read 0 bits", func(t *testing.T) {
-		r := NewReader(bytes.NewBuffer([]byte{1, 2, 3}))
-		res, err := r.ReadBits(0)
-		if err != nil {
-			t.Fatalf("unexpected error while reading 0 bits: %v", err)
-		}
-		if res != 0 {
-			t.Fatalf("invalid result after reading 0 bits: %d", res)
-		}
-	})
-
-	t.Run("invalid number of bytes to read", func(t *testing.T) {
-		r := NewReader(bytes.NewBuffer([]byte{1, 2, 3}))
-		if _, err := r.ReadBits(9); err == nil {
-			t.Fatal("no error when reading > 8 bits")
-		}
-	})
-
-	t.Run("EOF", func(t *testing.T) {
-		r := NewReader(bytes.NewBuffer([]byte{0b11001010}))
-		r.ReadBit()
-		_, err := r.ReadBits(8)
-		if err != io.EOF {
-			t.Fatalf("expected EOF but got: %v", err)
-		}
-	})
-
-	t.Run("reading 1 bit(bit = 1)", func(t *testing.T) {
-		r := NewReader(bytes.NewBuffer([]byte{0b11001010}))
-		res, err := r.ReadBits(1)
-		if err != nil {
-			t.Fatalf("unexpexted error while reading 1 bit: %v", err)
-		}
-		if res != 1<<7 {
-			t.Fatalf("nvalid reasult of reading 1 bit, expected: %d, got: %d", 1<<7, res)
-		}
-	})
-
-	t.Run("reading 1 bit(bit = 0)", func(t *testing.T) {
-		r := NewReader(bytes.NewBuffer([]byte{0b01001010}))
-		res, err := r.ReadBits(1)
-		if err != nil {
-			t.Fatalf("unexpexted error while reading 1 bit: %v", err)
-		}
-		if res != 0 {
-			t.Fatalf("invalid reasult of reading 1 bit, expected: %d, got: %d", 0, res)
-		}
-	})
-
-	t.Run("reading 8 bits", func(t *testing.T) {
-		const expected = 0b01001010
-		r := NewReader(bytes.NewBuffer([]byte{0b01001010}))
-		res, err := r.ReadBits(8)
-		if err != nil {
-			t.Fatalf("unexpected error while reading 8 bits: %v", err)
-		}
-		if res != expected {
-			t.Fatalf("invalid reasult of reading 8 bits, expected: %d, got: %d", expected, res)
-		}
-	})
-
-	t.Run("reading several bits inside byte", func(t *testing.T) {
-		r := NewReader(bytes.NewBuffer([]byte{0b01001010}))
-		res, err := r.ReadBits(3)
-		if err != nil {
-			t.Fatalf("unexpexted error while reading bits: %v", err)
-		}
-		if (res & 0b11100000) != 0b01000000 {
-			t.Fatalf("invalud reading result, expected: %d, got: %d", 0b01000000, res)
-		}
-		res, err = r.ReadBits(5)
-		if err != nil {
-			t.Fatalf("unexpexted error while reading bits: %v", err)
-		}
-		if (res & 0b11111000) != 0b01010000 {
-			t.Fatalf("invalud reading result, expected: %d, got: %d", 0b01010000, res)
-		}
-
-		if r.cache != 0 {
-			t.Fatalf("invalid cache value, expected: 0, result: %d", r.cache)
-		}
-
-		if r.cacheSize != 0 {
-			t.Fatalf("invalid cache size value, expected: 0, result: %d", r.cacheSize)
-		}
-	})
-
-	t.Run("read bits across boundary", func(t *testing.T) {
-		r := NewReader(bytes.NewBuffer([]byte{0b01001010, 0b10100101}))
-		r.ReadBits(5)
-		res, err := r.ReadBits(8)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if res != 0b01010100 {
-			t.Fatalf("invaliud result value, expected: %v, got: %v", 0b01010100, res)
-		}
-	})
-}

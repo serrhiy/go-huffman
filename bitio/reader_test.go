@@ -6,6 +6,136 @@ import (
 	"testing"
 )
 
+func TestRead(t *testing.T) {
+	t.Run("empty buffer", func(t *testing.T) {
+		r := NewReader(bytes.NewBuffer([]byte{}))
+		buffer := make([]byte, 1)
+		n, err := r.Read(buffer)
+		if err != io.EOF {
+			t.Fatalf("expexted error while reading from empty buffer, got: %d, %v", n, err)
+		}
+		if n != 0 {
+			t.Fatalf("readed more than zero bytes from empty buffer: %d", n)
+		}
+	})
+
+	t.Run("read zero bytes", func(t *testing.T) {
+		r := NewReader(bytes.NewBuffer([]byte{1, 2, 3}))
+		buffer := []byte{}
+		n, err := r.Read(buffer)
+		if err != nil {
+			t.Fatalf("unexpected error while reading 0 bytes: %v", err)
+		}
+		if n != 0 {
+			t.Fatalf("readed more than zero bytes to empty buffer: %d", n)
+		}
+	})
+
+	t.Run("read zero bytes from empty buffer", func(t *testing.T) {
+		r := NewReader(bytes.NewBuffer([]byte{}))
+		buffer := []byte{}
+		n, err := r.Read(buffer)
+		if err != nil {
+			t.Fatalf("unexpected error while reading 0 bytes from empty buffer: %v", err)
+		}
+		if n != 0 {
+			t.Fatalf("readed more than zero bytes from empty buffer: %d", n)
+		}
+	})
+
+	t.Run("read 1 byte", func(t *testing.T) {
+		r := NewReader(bytes.NewBuffer([]byte{10}))
+		buffer := make([]byte, 2)
+		n, err := r.Read(buffer)
+		if err != nil {
+			t.Fatalf("unxepected error while reading 1 byte: %v", err)
+		}
+		if n != 1 {
+			t.Fatalf("invalid number of readed bytes, expected: 1, got: %v", n)
+		}
+	})
+
+	t.Run("read multiple bytes", func(t *testing.T) {
+		source := []byte{10, 20, 30, 40}
+		r := NewReader(bytes.NewBuffer(source))
+		buffer := make([]byte, len(source))
+		n, err := r.Read(buffer)
+		if err != nil {
+			t.Fatalf("unexpected error while reading whole buffer: %v", err)
+		}
+		if n != len(source) {
+			t.Fatalf("invalid number of readed bytes, expected: %d, got: %d", len(source), n)
+		}
+		if !bytes.Equal(source, buffer) {
+			t.Fatalf("invalid bytes readed from buffer, expected: %v, got: %v", source, buffer)
+		}
+	})
+
+	t.Run("partial buffer read", func(t *testing.T) {
+		data := []byte{0x11, 0x22, 0x33, 0x44}
+		r := NewReader(bytes.NewBuffer(data))
+
+		buf := make([]byte, 2)
+		n, err := r.Read(buf)
+		if err != nil {
+			t.Fatalf("Read error: %v", err)
+		}
+		if n != 2 || buf[0] != 0x11 || buf[1] != 0x22 {
+			t.Fatalf("expected [0x11 0x22], got %v", buf[:n])
+		}
+
+		n, err = r.Read(buf)
+		if err != nil && err != io.EOF {
+			t.Fatalf("Read error: %v", err)
+		}
+		if n != 2 || buf[0] != 0x33 || buf[1] != 0x44 {
+			t.Fatalf("expected [0x33 0x44], got %v", buf[:n])
+		}
+	})
+
+	t.Run("read whole buffer by parts", func(t *testing.T) {
+		source := []byte{10, 20, 30, 40, 50, 60, 70, 80, 90, 100}
+		r := NewReader(bytes.NewBuffer(source))
+		buffer := make([]byte, 0, len(source))
+		for i := 1; len(buffer) < len(source); i++ {
+			toRead := min(i, len(source)-len(buffer))
+			b := make([]byte, toRead)
+			if _, err := r.Read(b); err != nil {
+				t.Fatalf("unexpected error while reading bytes: %v", err)
+			}
+			buffer = append(buffer, b...)
+		}
+		if !bytes.Equal(source, buffer) {
+			t.Fatalf("invalid bytes readed from buffer, expected: %v, got: %v", source, buffer)
+		}
+	})
+
+	t.Run("read more than is in the buffer", func(t *testing.T) {
+		r := NewReader(bytes.NewBuffer([]byte{1, 2, 3}))
+		buffer := make([]byte, 4)
+		n, _ := r.Read(buffer)
+		if n != 3 {
+			t.Fatalf("invalid number of readed bytes, expected: %d, got: %d", 3, n)
+		}
+		if _, err := r.Read(buffer); err != io.EOF {
+			t.Fatalf("expected EOF, got: %v", err)
+		}
+	})
+
+	t.Run("EOF after byte reading", func(t *testing.T) {
+		source := []byte{10, 20, 30}
+		r := NewReader(bytes.NewBuffer(source))
+		buffer := make([]byte, 2)
+		r.Read(buffer)
+		if n, _ := r.Read(buffer); n != 1 {
+			t.Fatalf("expected to read 1 byte, got: %d", n)
+		}
+		if _, err := r.Read(buffer); err != io.EOF {
+			t.Fatalf("expected EOF, got: %v", err)
+		}
+	})
+}
+
 func TestReaderBasic(t *testing.T) {
 	data := []byte{0xC1, 0b01000000}
 
@@ -112,28 +242,6 @@ func TestReadBitAndByteBoundary(t *testing.T) {
 	}
 }
 
-func TestPartialBufferRead(t *testing.T) {
-	data := []byte{0x11, 0x22, 0x33, 0x44}
-	r := NewReader(bytes.NewBuffer(data))
-
-	buf := make([]byte, 2)
-	n, err := r.Read(buf)
-	if err != nil {
-		t.Fatalf("Read error: %v", err)
-	}
-	if n != 2 || buf[0] != 0x11 || buf[1] != 0x22 {
-		t.Fatalf("expected [0x11 0x22], got %v", buf[:n])
-	}
-
-	n, err = r.Read(buf)
-	if err != nil && err != io.EOF {
-		t.Fatalf("Read error: %v", err)
-	}
-	if n != 2 || buf[0] != 0x33 || buf[1] != 0x44 {
-		t.Fatalf("expected [0x33 0x44], got %v", buf[:n])
-	}
-}
-
 func TestReaderAlign(t *testing.T) {
 	data := []byte{0b10101010, 0b11001100}
 	r := NewReader(bytes.NewBuffer(data))
@@ -213,15 +321,6 @@ func TestReaderBitAfterUnalignedByte(t *testing.T) {
 	}
 }
 
-func TestReaderReadZeroBytes(t *testing.T) {
-	r := NewReader(bytes.NewBuffer([]byte{0xAA}))
-
-	n, err := r.Read([]byte{})
-	if n != 0 || err != nil {
-		t.Fatalf("expected (0, nil), got (%d, %v)", n, err)
-	}
-}
-
 func TestReaderEmptyInput(t *testing.T) {
 	r := NewReader(bytes.NewBuffer(nil))
 
@@ -281,7 +380,7 @@ func TestReadBits(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid number of bytes to read", func (t *testing.T) {
+	t.Run("invalid number of bytes to read", func(t *testing.T) {
 		r := NewReader(bytes.NewBuffer([]byte{1, 2, 3}))
 		if _, err := r.ReadBits(9); err == nil {
 			t.Fatal("no error when reading > 8 bits")
@@ -303,8 +402,8 @@ func TestReadBits(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpexted error while reading 1 bit: %v", err)
 		}
-		if res != 1 << 7 {
-			t.Fatalf("nvalid reasult of reading 1 bit, expected: %d, got: %d", 1 << 7, res)
+		if res != 1<<7 {
+			t.Fatalf("nvalid reasult of reading 1 bit, expected: %d, got: %d", 1<<7, res)
 		}
 	})
 

@@ -12,20 +12,77 @@ type errWriter struct {
 }
 
 func (e *errWriter) Write(p []byte) (int, error) {
-	for i := range p {
-		if err := e.WriteByte(p[i]); err != nil {
+	for i, b := range p {
+		if err := e.WriteByte(b); err != nil {
 			return i, err
 		}
 	}
 	return len(p), nil
 }
 
-func (e *errWriter) WriteByte(b byte) error {
+func (e *errWriter) WriteByte(byte) error {
 	if e.limit <= 0 {
 		return errors.New("write limit reached")
 	}
 	e.limit--
 	return nil
+}
+
+func TestWriteByte(t *testing.T) {
+	t.Run("write byte by byte", func(t *testing.T) {
+		buf := &bytes.Buffer{}
+		w := NewWriter(buf)
+
+		if err := w.WriteByte(0x12); err != nil {
+			t.Fatalf("WriteByte error: %v", err)
+		}
+		if err := w.WriteByte(0x34); err != nil {
+			t.Fatalf("WriteByte error: %v", err)
+		}
+		if err := w.Flush(); err != nil {
+			t.Fatalf("WriteByte error: %v", err)
+		}
+
+		got := buf.Bytes()
+		want := []byte{0x12, 0x34}
+
+		if !bytes.Equal(got, want) {
+			t.Fatalf("expected %v, got %v", want, got)
+		}
+	})
+
+	t.Run("write all bytes", func(t *testing.T) {
+		buf := &bytes.Buffer{}
+		w := NewWriter(buf)
+		for i := range 256 {
+			if err := w.WriteByte(byte(i)); err != nil {
+				t.Fatalf("unexpected error while writing byte: %v", err)
+			}
+		}
+		w.Flush()
+		values := buf.Bytes()
+		for i := range 256 {
+			if values[i] != byte(i) {
+				t.Fatalf("invalid byte writed, expected: %d, got: %d", i, values[i])
+			}
+		}
+	})
+
+	t.Run("error propagation test", func(t *testing.T) {
+		w := NewWriter(&errWriter{9})
+		for i := range 9 {
+			if err := w.WriteByte(byte(i)); err != nil {
+				t.Fatalf("unexpected error while writing byte: %v", err)
+			}
+		}
+		if err := w.Flush(); err != nil {
+			t.Fatalf("unexpected error while flushing: %v", err)
+		}
+		w.WriteByte(1)
+		if err := w.Flush(); err == nil {
+			t.Fatalf("expected error, got: <nil>")
+		}
+	})
 }
 
 func TestWriterBasic(t *testing.T) {
@@ -83,28 +140,6 @@ func TestWriteBitPatterns(t *testing.T) {
 		if buf.Bytes()[0] != tc.want {
 			t.Fatalf("expected %08b got %08b", tc.want, buf.Bytes()[0])
 		}
-	}
-}
-
-func TestWriterByteByByte(t *testing.T) {
-	buf := &bytes.Buffer{}
-	w := NewWriter(buf)
-
-	if err := w.WriteByte(0x12); err != nil {
-		t.Fatalf("WriteByte error: %v", err)
-	}
-	if err := w.WriteByte(0x34); err != nil {
-		t.Fatalf("WriteByte error: %v", err)
-	}
-	if err := w.Flush(); err != nil {
-		t.Fatalf("WriteByte error: %v", err)
-	}
-
-	got := buf.Bytes()
-	want := []byte{0x12, 0x34}
-
-	if !bytes.Equal(got, want) {
-		t.Fatalf("expected %v, got %v", want, got)
 	}
 }
 
@@ -183,18 +218,6 @@ func TestAlignWriter(t *testing.T) {
 
 	if w.cacheSize != 0 {
 		t.Fatalf("expected cacheSize=0 got %d", w.cacheSize)
-	}
-}
-
-func TestWriterError(t *testing.T) {
-	w := NewWriter(&errWriter{1})
-
-	w.WriteBit(1)
-
-	if _, err := w.Write([]byte{1, 2}); err != nil {
-		if err := w.Flush(); err != nil {
-			t.Fatalf("expected write error")
-		}
 	}
 }
 

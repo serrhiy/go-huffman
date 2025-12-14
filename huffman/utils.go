@@ -1,10 +1,10 @@
 package huffman
 
 import (
+	"bufio"
 	"container/heap"
 	"fmt"
 	"io"
-	"bufio"
 
 	"github.com/serrhiy/go-huffman/bitio"
 )

@@ -9,7 +9,7 @@ import (
 )
 
 type errorReader struct {
-	limit int
+	limit  int
 	reader io.Reader
 }
 
@@ -338,6 +338,50 @@ func TestBuildCodes(t *testing.T) {
 	})
 }
 
+func TestCalculateTreeSize(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		if size := calculateTreeSize(nil); size != 0 {
+			t.Fatalf("expected 0 but got %d", size)
+		}
+	})
+
+	t.Run("one leaf", func(t *testing.T) {
+		const expected = 1 + 1 + 8
+		root := &node{
+			left: &node{char: 'a', count: 1},
+		}
+		if size := calculateTreeSize(root); size != expected {
+			t.Fatalf("invalud tree size, expected: %d, got: %d", expected, size)
+		}
+	})
+
+	t.Run("tree", func(t *testing.T) {
+		//        (*,37)
+		//    1 /         \ 0
+		// D(15)          (*,22)
+		//              1 /     \ 0
+		//           C(10)      (*,12)
+		//                    1 /    \ 0
+		//                  A(5)      B(7)
+		root := &node{
+			left: &node{char: 'd', count: 15},
+			right: &node{
+				count: 22,
+				left:  &node{char: 'c', count: 10},
+				right: &node{
+					count: 12,
+					left:  &node{char: 'a', count: 5},
+					right: &node{char: 'b', count: 7},
+				},
+			},
+		}
+		const expected = 1 + 2 + 2 + 2 + 4 * 8
+		if size := calculateTreeSize(root); size != expected {
+			t.Fatalf("invalud tree size, expected: %d, got: %d", expected, size)
+		}
+	})
+}
+
 func TestBuildReverseCodesSingleLeaf(t *testing.T) {
 	root := &node{char: 'A'}
 	codes := buildReverseCodes(root)
@@ -495,34 +539,5 @@ func TestCalculateContentSizeError(t *testing.T) {
 	}
 	if size, err := calculateContentSize(codes, frequencies); err == nil {
 		t.Fatalf("error expected but got: %d, %v", size, err)
-	}
-}
-
-func TestCalculateTreeSizeEmpty(t *testing.T) {
-	if size := calculateTreeSize(nil); size != 0 {
-		t.Fatalf("expected 0 but got %d", size)
-	}
-}
-
-func TestCalculateTreeSize(t *testing.T) {
-	const expected = 1 + 9 + 1 + 9 + 9
-	root := &node{
-		left: &node{
-			char:  'a',
-			count: 10,
-		},
-		right: &node{
-			left: &node{
-				char:  'b',
-				count: 5,
-			},
-			right: &node{
-				char:  'c',
-				count: 4,
-			},
-		},
-	}
-	if size := calculateTreeSize(root); size != expected {
-		t.Fatalf("calculateTreeSize faled, expected: %d, got %d", expected, size)
 	}
 }

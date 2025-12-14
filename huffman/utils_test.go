@@ -102,7 +102,19 @@ func FuzzGetFrequencyMap(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, a string) {
+		freq, err := getFrequencyMap(bytes.NewBufferString(a))
 
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		var total uint = 0
+		for _, n := range freq {
+			total += n
+		}
+		if total != uint(len(a)) {
+			t.Fatalf("invalid size, expected: %d, got: %d", len(a), total)
+		}
 	})
 }
 

@@ -19,31 +19,11 @@ func NewEncoder(reader io.ReadSeeker, writer io.Writer) *HuffmanEncoder {
 	return &HuffmanEncoder{reader, writer}
 }
 
-func (encoder *HuffmanEncoder) getFrequencyMap() (map[byte]uint, error) {
-	if _, err := encoder.reader.Seek(0, io.SeekStart); err != nil {
-		return nil, err
-	}
-
-	result := make(map[byte]uint, 1<<7)
-	reader := bufio.NewReader(encoder.reader)
-	buffer := make([]byte, bufferSize)
-	for {
-		readed, err := reader.Read(buffer)
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return nil, err
-		}
-		for index := range readed {
-			result[buffer[index]] += 1
-		}
-	}
-	return result, nil
-}
-
 func (encoder *HuffmanEncoder) Encode() error {
-	frequencies, err := encoder.getFrequencyMap()
+	if _, err := encoder.reader.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	frequencies, err := getFrequencyMap(encoder.reader)
 	if err != nil {
 		return err
 	}

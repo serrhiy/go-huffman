@@ -3,9 +3,30 @@ package huffman
 import (
 	"container/heap"
 	"fmt"
+	"io"
+	"bufio"
 
 	"github.com/serrhiy/go-huffman/bitio"
 )
+
+func getFrequencyMap(r io.Reader) (map[byte]uint, error) {
+	result := make(map[byte]uint, 1<<7)
+	reader := bufio.NewReader(r)
+	buffer := make([]byte, bufferSize)
+	for {
+		readed, err := reader.Read(buffer)
+		for i := range readed {
+			result[buffer[i]] += 1
+		}
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
+		}
+	}
+	return result, nil
+}
 
 func toPriorityQueue(frequencies map[byte]uint) priorityQueue {
 	result := make(priorityQueue, 0, len(frequencies))

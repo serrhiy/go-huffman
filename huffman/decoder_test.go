@@ -3,11 +3,24 @@ package huffman
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"io"
 	"testing"
 
 	"github.com/serrhiy/go-huffman/bitio"
 )
+
+type brokenReader struct {
+	io.ReadSeeker
+}
+
+func (b *brokenReader) Read([]byte) (int, error) {
+	return 0, errors.New("read error")
+}
+
+func (b *brokenReader) Seek(offset int64, whence int) (int64, error) {
+	return offset, nil
+}
 
 func encodeDecode(input []byte, t *testing.T) []byte {
 	in := bytes.NewReader(input)

@@ -4,25 +4,10 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"io"
 	"testing"
+
+	"github.com/serrhiy/go-huffman/bitio"
 )
-
-// func bitsNumberToBytesNumber(bits uint16) uint16 {
-// 	return (bits + 8 - bits%8) / 8
-// }
-
-type brokenReader struct {
-	io.ReadSeeker
-}
-
-func (b *brokenReader) Read([]byte) (int, error) {
-	return 0, errors.New("read error")
-}
-
-func (b *brokenReader) Seek(offset int64, whence int) (int64, error) {
-	return offset, nil
-}
 
 type failingWriter struct {
 	n int
@@ -39,72 +24,122 @@ func (fw *failingWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// func TestWriteCodesSingleLeaf(t *testing.T) {
-// 	root := &node{
-// 		left: &node{
-// 			char:  'a',
-// 			count: 1,
-// 		},
-// 		right: nil,
-// 	}
+func TestWriteHeader(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		writer := &bytes.Buffer{}
+		reader := bytes.NewReader([]byte{})
+		encoder := NewEncoder(reader, writer)
+		if err := encoder.writeHeader(nil); err != nil {
+			t.Fatalf("unexpected error while writing header: %v", err)
+		}
+		header := writer.Bytes()
+		if len(header) != 2 {
+			t.Fatalf("length of empty byffer must be 2, got: %d", len(header))
+		}
+		if header[0] != 0 || header[1] != 0 {
+			t.Fatalf("header length for empty buffer mast be 0, actual: %v", header)
+		}
+	})
 
-// 	buf := &bytes.Buffer{}
-// 	enc := NewEncoder(nil, buf)
+	t.Run("error propagation", func(t *testing.T) {
+		root := &node{
+			left: &node{char: 'a', count: 10},
+		}
+		fw := &failingWriter{n: 3}
+		enc := NewEncoder(nil, fw)
+		err := enc.writeHeader(root)
+		if err == nil {
+			t.Fatalf("expected writer error")
+		}
+	})
 
-// 	if err := enc.writeCodes(root); err != nil {
-// 		t.Fatalf("unexpected error: %v", err)
-// 	}
+	t.Run("single leaf", func(t *testing.T) {
+		root := &node{
+			left: &node{char: 'a', count: 10},
+		}
+		writer := &bytes.Buffer{}
+		reader := bytes.NewReader([]byte{})
+		encoder := NewEncoder(reader, writer)
+		if err := encoder.writeHeader(root); err != nil {
+			t.Fatalf("unexpected error while writing header: %v", err)
+		}
+		header := writer.Bytes()
+		if len(header) != 4 {
+			t.Fatalf("invalid header length, expected: %d, got: %d", 4, len(header))
+		}
+		expectedLength := calculateTreeSize(root)
+		length := binary.LittleEndian.Uint16(header)
+		if length != expectedLength {
+			t.Fatalf("invalid length field, expected: %d, got: %d", expectedLength, length)
+		}
+		codes := func() []byte {
+			buf := &bytes.Buffer{}
+			writer := bitio.NewWriter(buf)
+			if err := writeCodes(root, writer); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			writer.Flush()
+			return buf.Bytes()
+		}()
 
-// 	out := buf.Bytes()
-// 	expectedLength := calculateTreeSize(root)
-// 	expexted := bitsNumberToBytesNumber(expectedLength) + 2
-// 	if len(out) != int(expexted) {
-// 		t.Fatalf("expected size %d, got %d", expexted, len(out))
-// 	}
-// 	actualLength := binary.LittleEndian.Uint16(out)
-// 	if expectedLength != actualLength {
-// 		t.Fatalf("expected header size: %d, got: %d", expectedLength, actualLength)
-// 	}
-// }
+		if !bytes.Equal(codes, header[2:]) {
+			t.Fatalf("invalid codes field, expected: %v, got: %v", codes, header[2:])
+		}
+	})
 
-// func TestWriteCodesSimpleTree(t *testing.T) {
-// 	root := &node{
-// 		left:  &node{char: 'A', count: 3},
-// 		right: &node{char: 'B', count: 5},
-// 	}
+	// other cases should be covered in fuzzing tests
+}
 
-// 	buf := &bytes.Buffer{}
-// 	enc := NewEncoder(nil, buf)
+func FuzzWriteHeader(f *testing.F) {
+	testcases := []string{
+		"Hello, world!",
+		"",
+		" ",
+		"ab",
+		"12345",
+		"aaaaacccccbbbbbbbb",
+		"aaacaaacccccbccbbaabbvccbbaab",
+		"abcdefghijklmnopqrstuvwxyz",
+		"Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+		string([]byte{1, 23, 10, 11, 23, 75, 123, 233, 31, 255, 0, 11}),
+	}
+	for _, tc := range testcases {
+		f.Add(tc)
+	}
 
-// 	err := enc.writeCodes(root)
-// 	if err != nil {
-// 		t.Fatalf("writeCodes returned error: %v", err)
-// 	}
-
-// 	b := buf.Bytes()
-// 	if len(b) == 0 {
-// 		t.Fatalf("expected non empty result, got %v", b)
-// 	}
-
-// 	expectedLength := calculateTreeSize(root)
-// 	actualLength := binary.LittleEndian.Uint16(b)
-
-// 	if expectedLength != actualLength {
-// 		t.Fatalf("expected some bit-encoded data before newline")
-// 	}
-// }
-
-// func TestWriteCodesWriterError(t *testing.T) {
-// 	root := &node{char: 'X', count: 1}
-
-// 	fw := &failingWriter{n: 0}
-// 	enc := NewEncoder(nil, fw)
-
-// 	err := enc.writeCodes(root)
-// 	if err == nil {
-// 		t.Fatalf("expected writer error")
-// 	}
-// }
+	f.Fuzz(func(t *testing.T, a string) {
+		b := []byte(a)
+		writer := &bytes.Buffer{}
+		reader := bytes.NewReader(b)
+		encoder := NewEncoder(reader, writer)
+		freq, err := getFrequencyMap(encoder.reader)
+		if err != nil {
+			t.Fatalf("unexpected error while computing frequency map on %v", b)
+		}
+		root := buildTree(freq)
+		if err := encoder.writeHeader(root); err != nil {
+			t.Fatalf("unexpected error while writinh header on %v, err: %v", b, err)
+		}
+		header := writer.Bytes()
+		expectedLength := calculateTreeSize(root)
+		length := binary.LittleEndian.Uint16(header)
+		if expectedLength != length {
+			t.Fatalf("invalid length writed, expected: %d, got: %d", expectedLength, length)
+		}
+		codes := func() []byte {
+			buf := &bytes.Buffer{}
+			writer := bitio.NewWriter(buf)
+			if err := writeCodes(root, writer); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			writer.Flush()
+			return buf.Bytes()
+		}()
+		if !bytes.Equal(codes, header[2:]) {
+			t.Fatalf("invalid codes field, expected: %v, got: %v", codes, header[2:])
+		}
+	})
+}
 
 func TestEncodeContentSingleByte(t *testing.T) {
 	reader := bytes.NewReader([]byte{'A'})

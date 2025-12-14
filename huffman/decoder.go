@@ -58,9 +58,9 @@ func _readTree(reader *bitio.Reader, length uint16) (*node, error) {
 	return next()
 }
 
-func (decoder *HuffmanDecoder) readTree(reader *bitio.Reader) (*node, error) {
+func readTree(reader *bitio.Reader) (*node, error) {
 	buffer := make([]byte, 2)
-	if _, err := reader.Read(buffer); err != nil {
+	if _, err := io.ReadFull(reader, buffer); err != nil {
 		return nil, err
 	}
 	headerSize := binary.LittleEndian.Uint16(buffer)
@@ -69,10 +69,10 @@ func (decoder *HuffmanDecoder) readTree(reader *bitio.Reader) (*node, error) {
 
 func (decoder *HuffmanDecoder) Decode() error {
 	reader := bitio.NewReader(decoder.reader)
-	root, err := decoder.readTree(reader)
+	root, err := readTree(reader)
 	if err != nil {
 		if err == io.EOF {
-			return nil
+			return errors.New("invalid file structure")
 		}
 		return err
 	}

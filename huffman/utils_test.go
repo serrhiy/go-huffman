@@ -6,6 +6,8 @@ import (
 	"errors"
 	"io"
 	"testing"
+
+	"github.com/serrhiy/go-huffman/bitio"
 )
 
 type errorReader struct {
@@ -453,7 +455,7 @@ func TestBuildReverseCodes(t *testing.T) {
 
 	t.Run("single leaf", func(t *testing.T) {
 		root := &node{
-			left:  &node{char: 'a'},
+			left: &node{char: 'a'},
 		}
 		codes := buildReverseCodes(root)
 
@@ -487,8 +489,8 @@ func TestBuildReverseCodes(t *testing.T) {
 		}
 
 		expected := map[string]byte{
-			"1": 'd',
-			"01": 'c',
+			"1":   'd',
+			"01":  'c',
 			"001": 'a',
 			"000": 'b',
 		}
@@ -500,6 +502,68 @@ func TestBuildReverseCodes(t *testing.T) {
 			if codes[k] != v {
 				t.Fatalf("expected code %s -> %c, got %v", k, v, codes)
 			}
+		}
+	})
+}
+
+func TestWriteCodes(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		if err := writeCodes(nil, nil); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("single leaf", func(t *testing.T) {
+		root := &node{
+			left: &node{char: 'a', count: 10},
+		}
+		buf := &bytes.Buffer{}
+		writer := bitio.NewWriter(buf)
+		if err := writeCodes(root, writer); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		writer.Flush()
+		result := buf.Bytes()
+		if len(result) != 2 {
+			t.Fatalf("invalid content size, expected: %d, got: %d", 2, len(result))
+		}
+
+		if result[0]>>7 != 0 {
+			t.Fatal("invalid content structure, expected first bit to be 0, got 1")
+		}
+		if (result[0]&0b01000000)>>6 != 1 {
+			t.Fatal("invalid content structure, expected second bit to be 1, got 0")
+		}
+		char := byte((result[0]&0b00111111)<<2 | ((result[1] & 0b11000000) >> 6))
+		if char != 'a' {
+			t.Fatalf("invalid content structure, next 8 bits should represent character 'a' but got: %#08b", char)
+		}
+		if (result[1] & 0b00111111) != 0 {
+			t.Fatalf("the rest of byte should be filled with 0 bits, got: %#08b", result[1]&0b00111111)
+		}
+	})
+
+	t.Run("full tree", func(t *testing.T) {
+		root := &node{
+			left:  &node{char: 'a', count: 10},
+			right: &node{char: 'b', count: 15},
+		}
+		buf := &bytes.Buffer{}
+		writer := bitio.NewWriter(buf)
+		if err := writeCodes(root, writer); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		writer.Flush()
+		result := buf.Bytes()
+		if len(result) != 3 {
+			t.Fatalf("invalid content size, expected: %d, got: %d", 3, len(result))
+		}
+		if (result[1]&0b00100000)>>5 != 1 {
+			t.Fatalf("invalid content structure, expected bit to be 0, got 1")
+		}
+		char := byte(((result[1] & 0b00011111) << 3) | (result[2] >> 5))
+		if char != 'b' {
+			t.Fatalf("invalid content structure, next 8 bits should represent character 'b' but got: %#08b", char)
 		}
 	})
 }

@@ -190,7 +190,7 @@ func TestWriteBits(t *testing.T) {
 		}
 	})
 
-	t.Run("invalud bytes length", func(t *testing.T) {
+	t.Run("invalid bytes length", func(t *testing.T) {
 		buf := &bytes.Buffer{}
 		w := NewWriter(buf)
 		if err := w.WriteBits(0xff, 9); err == nil {
@@ -221,6 +221,31 @@ func TestWriteBits(t *testing.T) {
 					t.Fatalf("invalid bytes writed: expected: %d, got: %d", (expected & mask), result)
 				}
 			}
+		}
+	})
+
+	t.Run("several bytes", func(t *testing.T) {
+		buf := &bytes.Buffer{}
+		w := NewWriter(buf)
+
+		w.WriteBits(0b10110000, 5)
+		w.WriteBits(0b01011100, 7)
+		if w.cacheSize != 4 {
+			t.Fatalf("invalid cache size, expected: %d", w.cacheSize)
+		}
+		if err := w.Flush(); err != nil {
+			t.Fatalf("unexpected error while flushing: %v", err)
+		}
+
+		result := buf.Bytes()
+		if len(result) != 2 {
+			t.Fatalf("invalid buffers length, expected: %d, got: %d", 2, len(result))
+		}
+		if result[0] != 0b10110010 {
+			t.Fatalf("invalid first byte writed, expected: %#08b, got: %#08b", 0b10110101, result[0])
+		}
+		if result[1] != 0b11100000 {
+			t.Fatalf("invalid second byte writed, expected: %#08b, got: %#08b", 0b11101000, result[1])
 		}
 	})
 }
@@ -277,17 +302,50 @@ func TestWriteBit(t *testing.T) {
 
 			for _, b := range tc.bits {
 				if err := w.WriteBit(b); err != nil {
-					t.Fatalf("write error: %v", err)
+					t.Fatalf("unexpected error while writing: %v", err)
 				}
 			}
 
 			if err := w.Flush(); err != nil {
-				t.Fatalf("flush error: %v", err)
+				t.Fatalf("unexpected error while flushing: %v", err)
 			}
 
 			if buf.Bytes()[0] != tc.want {
 				t.Fatalf("expected %#08b got %#08b", tc.want, buf.Bytes()[0])
 			}
+		}
+	})
+
+	t.Run("several bytes", func(t *testing.T) {
+		buf := &bytes.Buffer{}
+		w := NewWriter(buf)
+
+		w.WriteBit(1)
+		w.WriteBit(1)
+		w.WriteBit(0)
+		w.WriteBit(0)
+		w.WriteBit(1)
+		w.WriteBit(0)
+		w.WriteBit(1)
+		w.WriteBit(0)
+
+		w.WriteBit(1)
+		w.WriteBit(1)
+		w.WriteBit(0)
+
+		if err := w.Flush(); err != nil {
+			t.Fatalf("unexpected error while flushing: %v", err)
+		}
+
+		result := buf.Bytes()
+		if len(result) != 2 {
+			t.Fatalf("invalid buffers length, expected: %d, got: %d", 2, len(result))
+		}
+		if result[0] != 0b11001010 {
+			t.Fatalf("invalid first byte writed, expected: %#08b, got: %#08b", 0b11001010, result[0])
+		}
+		if result[1] != 0b11000000 {
+			t.Fatalf("invalid second byte writed, expected: %#08b, got: %#08b", 0b11000000, result[1])
 		}
 	})
 }
@@ -369,6 +427,170 @@ func TestWriterAlign(t *testing.T) {
 			if result != expected {
 				t.Fatalf("invalid bit value: %d, expected: %d", result, expected)
 			}
+		}
+	})
+}
+
+func TestWriterCombinations(t *testing.T) {
+	t.Run("WriteBit and WriteByte", func(t *testing.T) {
+		t.Run("WriteBit + WriteByte", func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			w := NewWriter(buf)
+
+			w.WriteBit(1)
+			w.WriteBit(0)
+			w.WriteBit(1)
+
+			w.WriteByte(0b10011010)
+
+			w.Flush()
+
+			result := buf.Bytes()
+			if len(result) != 2 {
+				t.Fatalf("invalid length, expected: %d, got: %d", 2, len(result))
+			}
+			if result[0]&0b11100000 != 0b10100000 {
+				t.Fatalf("invalid first 3 bits writed, expected: %#08b, got: %#08b", 0b10100000, result[0]&0b11100000)
+			}
+			if result[0] != 0b10110011 {
+				t.Fatalf("invalid first byte writed, expected: %#08b, got: %#08b", 0b10110011, result[0])
+			}
+			if result[1] != 0b01000000 {
+				t.Fatalf("invalid second byte writed, expected: %#08b, got: %#08b", 0b01000000, result[1])
+			}
+		})
+
+		t.Run("WriteByte + WriteBit", func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			w := NewWriter(buf)
+
+			w.WriteByte(0b10011010)
+
+			w.WriteBit(1)
+			w.WriteBit(1)
+			w.WriteBit(0)
+			w.WriteBit(1)
+
+			w.Flush()
+
+			result := buf.Bytes()
+			if len(result) != 2 {
+				t.Fatalf("invalid buffer length, expected: %d, got: %d", 2, len(result))
+			}
+			if result[0] != 0b10011010 {
+				t.Fatalf("invalid first byte writed, expected: %#08b, got: %#08b", 0b10011010, result[0])
+			}
+			if result[1]&0b11110000 != 0b11010000 {
+				t.Fatalf("invalid second byte writed, expected: %#08b, got: %#08b", 0b11010000, result[1])
+			}
+		})
+	})
+
+	t.Run("WriteBits and WriteBit", func(t *testing.T) {
+		t.Run("inside byte", func(t *testing.T) {
+			for i := range 256 {
+				expected := byte(i)
+				for j := range 8 {
+					buf := &bytes.Buffer{}
+					w := NewWriter(buf)
+					if err := w.WriteBits(expected, byte(j)); err != nil {
+						t.Fatalf("unexpected error while writing bits: %v", err)
+					}
+					for k := j; k < 8; k++ {
+						bit := expected & (1 << (8 - 1 - k))
+						if err := w.WriteBit(bit); err != nil {
+							t.Fatalf("unexpected error while writing bit: %v", err)
+						}
+					}
+					if err := w.Flush(); err != nil {
+						t.Fatalf("unexpected error whiule flushing: %v", err)
+					}
+					result := buf.Bytes()
+					if len(result) != 1 {
+						t.Fatalf("unexpected buffers length, expected: %d, got: %d", 1, len(result))
+					}
+					if result[0] != expected {
+						t.Fatalf("invalid bytes writed, expected: %#08b, got: %#08b", expected, result[0])
+					}
+				}
+			}
+		})
+
+		t.Run("WriteBit + WriteBits", func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			w := NewWriter(buf)
+
+			w.WriteBit(1)
+			w.WriteBit(0)
+			w.WriteBit(1)
+
+			w.WriteBits(0b01101100, 6)
+
+			w.Flush()
+
+			result := buf.Bytes()
+			if len(result) != 2 {
+				t.Fatalf("invalid buffer length, expected: %d, got: %d", 2, len(result))
+			}
+			if result[0] != 0b10101101 {
+				t.Fatalf("invalid first byte writed, expected: %#08b, got: %#08b", 0b10101101, result[0])
+			}
+			if result[1] != 0b10000000 {
+				t.Fatalf("invalid second byte writed, expected: %#08b, got: %#08b", 0b10000000, result[1])
+			}
+		})
+
+		t.Run("WriteBits + WriteBit", func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			w := NewWriter(buf)
+
+			w.WriteBits(0b10110000, 5)
+
+			w.WriteBit(1)
+			w.WriteBit(0)
+			w.WriteBit(0)
+			w.WriteBit(1)
+			w.WriteBit(0)
+			w.WriteBit(1)
+			w.WriteBit(1)
+
+			w.Flush()
+
+			result := buf.Bytes()
+			if len(result) != 2 {
+				t.Fatalf("invalid bytes number writed, expected: %d, got: %d", 2, len(result))
+			}
+			if result[0] != 0b10110100 {
+				t.Fatalf("invalid first byte writed, expected: %#08b, got: %#08b", 0b10110100, result[0])
+			}
+			if result[1] != 0b10110000 {
+				t.Fatalf("invalid second byte writed, expected: %#08b, got: %#08b", 0b10110000, result[1])
+			}
+		})
+	})
+
+	t.Run("WriteBits + Write", func(t *testing.T) {
+		buf := &bytes.Buffer{}
+		w := NewWriter(buf)
+
+		w.WriteBit(1)
+		w.WriteBit(0)
+		w.WriteBit(0)
+		w.WriteBit(1)
+
+		w.Write([]byte{0xff})
+
+		w.Flush()
+
+		result := buf.Bytes()
+		if len(result) != 2 {
+			t.Fatalf("invalid bytes number writed, expected: %d, got: %d", 2, len(result))
+		}
+		if result[0] != 0b10011111 {
+			t.Fatalf("invalid first byte writed, expected: %#08b, got: %#08b", 0b10011111, result[0])
+		}
+		if result[1] != 0b11110000 {
+			t.Fatalf("invalid second byte writed, expected: %#08b, got: %#08b", 0b11110000, result[1])
 		}
 	})
 }

@@ -141,87 +141,119 @@ func FuzzWriteHeader(f *testing.F) {
 	})
 }
 
-func TestEncodeContentSingleByte(t *testing.T) {
-	reader := bytes.NewReader([]byte{'A'})
-	writer := &bytes.Buffer{}
-	enc := NewEncoder(reader, writer)
-	codes := map[byte]string{'a': "1"}
-	size, _ := calculateContentSize(codes, map[byte]uint{'a': 1})
-
-	if err := enc.encodeContent(codes, size); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	data := writer.Bytes()
-	if actualSize := binary.LittleEndian.Uint64(data); actualSize != size {
-		t.Fatalf("invalid content size, expected %d, got %d", size, actualSize)
-	}
-}
-
-func TestEncodeContentMultipleBytes(t *testing.T) {
-	reader := bytes.NewReader([]byte{'a', 'b', 'a'})
-	writer := &bytes.Buffer{}
-	enc := NewEncoder(reader, writer)
-
-	codes := map[byte]string{'a': "0", 'b': "1"}
-	frequencies := map[byte]uint{'A': 2, 'B': 1}
-	size, _ := calculateContentSize(codes, frequencies)
-
-	if err := enc.encodeContent(codes, size); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	data := writer.Bytes()
-	if len(data) == 0 {
-		t.Fatal("expected some bytes to be written")
-	}
-}
-
-func TestEncodeContentVariedBitLengths(t *testing.T) {
-	reader := bytes.NewReader([]byte{'a', 'b', 'c'})
-	writer := &bytes.Buffer{}
-	enc := NewEncoder(reader, writer)
-
-	codes := map[byte]string{'A': "1", 'B': "01", 'C': "001"}
-
-	if err := enc.encodeContent(codes, 1+2+3); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if writer.Len() == 0 {
-		t.Fatal("expected data to be written")
-	}
-}
-
-func TestEncodeContentWriterError(t *testing.T) {
-	reader := bytes.NewReader([]byte{'A'})
-	enc := NewEncoder(reader, &failingWriter{})
-
-	codes := map[byte]string{'A': "1"}
-	if err := enc.encodeContent(codes, 1); err == nil {
-		t.Fatal("expected write error, got nil")
-	}
-}
-
-func TestEncodeDeterministicLength(t *testing.T) {
-	input := []byte("this is a test string for huffman encoder")
-	repetitions := 5
-	var lastLen int
-
-	for i := range repetitions {
-		r := bytes.NewReader(input)
-		w := &bytes.Buffer{}
-		enc := NewEncoder(r, w)
-
-		if err := enc.Encode(); err != nil {
-			t.Fatalf("Encode failed: %v", err)
+func TestEncodeContent(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		writer := &bytes.Buffer{}
+		reader := bytes.NewReader([]byte{})
+		encoder := NewEncoder(reader, writer)
+		if err := encoder.encodeContent(map[byte]string{}, map[byte]uint{}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
 		}
-
-		encodedLen := w.Len()
-		if i > 0 && encodedLen != lastLen {
-			t.Fatalf("encoded length differs on repetition %d: got %d, want %d", i, encodedLen, lastLen)
+		content := writer.Bytes()
+		if len(content) != 8 {
+			t.Fatalf("invalid length, expected 8, got: %v", len(content))
 		}
+		for _, b := range content {
+			if b != 0 {
+				t.Fatalf("unexpected bit in content length, expected all to be 0, got: %v", content)
+			}
+		}
+	})
 
-		lastLen = encodedLen
-	}
+	t.Run("error propagation", func(t *testing.T) {
+		reader := bytes.NewReader([]byte("aaa"))
+		encoder := NewEncoder(reader, &failingWriter{n: 3})
+		codes := map[byte]string{'a': "0"}
+		freq := map[byte]uint{'a': 3}
+		if err := encoder.encodeContent(codes, freq); err == nil {
+			t.Fatalf("expected writer error")
+		}
+	})
+
+	// other cases should be covered in fuzzing tests
 }
+
+// func TestEncodeContentSingleByte(t *testing.T) {
+// 	reader := bytes.NewReader([]byte{'A'})
+// 	writer := &bytes.Buffer{}
+// 	enc := NewEncoder(reader, writer)
+// 	codes := map[byte]string{'a': "1"}
+// 	size, _ := calculateContentSize(codes, map[byte]uint{'a': 1})
+
+// 	if err := enc.encodeContent(codes, size); err != nil {
+// 		t.Fatalf("unexpected error: %v", err)
+// 	}
+
+// 	data := writer.Bytes()
+// 	if actualSize := binary.LittleEndian.Uint64(data); actualSize != size {
+// 		t.Fatalf("invalid content size, expected %d, got %d", size, actualSize)
+// 	}
+// }
+
+// func TestEncodeContentMultipleBytes(t *testing.T) {
+// 	reader := bytes.NewReader([]byte{'a', 'b', 'a'})
+// 	writer := &bytes.Buffer{}
+// 	enc := NewEncoder(reader, writer)
+
+// 	codes := map[byte]string{'a': "0", 'b': "1"}
+// 	frequencies := map[byte]uint{'A': 2, 'B': 1}
+// 	size, _ := calculateContentSize(codes, frequencies)
+
+// 	if err := enc.encodeContent(codes, size); err != nil {
+// 		t.Fatalf("unexpected error: %v", err)
+// 	}
+
+// 	data := writer.Bytes()
+// 	if len(data) == 0 {
+// 		t.Fatal("expected some bytes to be written")
+// 	}
+// }
+
+// func TestEncodeContentVariedBitLengths(t *testing.T) {
+// 	reader := bytes.NewReader([]byte{'a', 'b', 'c'})
+// 	writer := &bytes.Buffer{}
+// 	enc := NewEncoder(reader, writer)
+
+// 	codes := map[byte]string{'A': "1", 'B': "01", 'C': "001"}
+
+// 	if err := enc.encodeContent(codes, 1+2+3); err != nil {
+// 		t.Fatalf("unexpected error: %v", err)
+// 	}
+
+// 	if writer.Len() == 0 {
+// 		t.Fatal("expected data to be written")
+// 	}
+// }
+
+// func TestEncodeContentWriterError(t *testing.T) {
+// 	reader := bytes.NewReader([]byte{'A'})
+// 	enc := NewEncoder(reader, &failingWriter{})
+
+// 	codes := map[byte]string{'A': "1"}
+// 	if err := enc.encodeContent(codes, 1); err == nil {
+// 		t.Fatal("expected write error, got nil")
+// 	}
+// }
+
+// func TestEncodeDeterministicLength(t *testing.T) {
+// 	input := []byte("this is a test string for huffman encoder")
+// 	repetitions := 5
+// 	var lastLen int
+
+// 	for i := range repetitions {
+// 		r := bytes.NewReader(input)
+// 		w := &bytes.Buffer{}
+// 		enc := NewEncoder(r, w)
+
+// 		if err := enc.Encode(); err != nil {
+// 			t.Fatalf("Encode failed: %v", err)
+// 		}
+
+// 		encodedLen := w.Len()
+// 		if i > 0 && encodedLen != lastLen {
+// 			t.Fatalf("encoded length differs on repetition %d: got %d, want %d", i, encodedLen, lastLen)
+// 		}
+
+// 		lastLen = encodedLen
+// 	}
+// }

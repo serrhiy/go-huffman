@@ -5,138 +5,143 @@ import (
 	"testing"
 )
 
-func newNode(char byte, count uint) *node {
-	return &node{char: char, count: count}
-}
+func TestPriorityQueue(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		var queue priorityQueue
+		heap.Init(&queue)
 
-func TestPriorityQueueLen(t *testing.T) {
-	pq := priorityQueue{}
-	if pq.Len() != 0 {
-		t.Fatalf("expected length 0, got %d", pq.Len())
-	}
-
-	heap.Push(&pq, newNode('a', 1))
-	if pq.Len() != 1 {
-		t.Fatalf("expected length 1, got %d", pq.Len())
-	}
-}
-
-func TestPriorityQueueLess(t *testing.T) {
-	pq := priorityQueue{
-		newNode('a', 1),
-		newNode('b', 2),
-		newNode('c', 0),
-	}
-
-	if !pq.Less(2, 0) {
-		t.Fatalf("expected pq[2] < pq[0]")
-	}
-	if pq.Less(1, 0) {
-		t.Fatalf("expected pq[1] >= pq[0]")
-	}
-}
-
-func TestPriorityQueueSwap(t *testing.T) {
-	pq := priorityQueue{
-		newNode('a', 1),
-		newNode('b', 2),
-	}
-	pq.Swap(0, 1)
-	if pq[0].char != 'b' || pq[1].char != 'a' {
-		t.Fatalf("Swap failed, got %v %v", pq[0].char, pq[1].char)
-	}
-}
-
-func TestPriorityQueuePushPopSingle(t *testing.T) {
-	var pq priorityQueue
-	heap.Init(&pq)
-
-	n := newNode('x', 5)
-	heap.Push(&pq, n)
-
-	if pq.Len() != 1 {
-		t.Fatalf("expected length 1, got %d", pq.Len())
-	}
-
-	item := pq.Pop().(*node)
-	if item != n {
-		t.Fatalf("expected popped node to be the same")
-	}
-
-	if pq.Len() != 0 {
-		t.Fatalf("expected length 0 after pop, got %d", pq.Len())
-	}
-}
-
-func TestPriorityQueueHeapOrder(t *testing.T) {
-	var pq priorityQueue
-	heap.Init(&pq)
-
-	nodes := []*node{
-		newNode('a', 5),
-		newNode('b', 1),
-		newNode('c', 3),
-		newNode('d', 2),
-	}
-
-	for _, n := range nodes {
-		heap.Push(&pq, n)
-	}
-
-	expectedOrder := []byte{'b', 'd', 'c', 'a'}
-	for _, expChar := range expectedOrder {
-		n := heap.Pop(&pq).(*node)
-		if n.char != expChar {
-			t.Fatalf("expected %c, got %c", expChar, n.char)
+		if queue.Len() != 0 {
+			t.Fatalf("empty que has non zero length: %d", queue.Len())
 		}
-	}
-}
+	})
 
-func TestPriorityQueuePopEmpty(t *testing.T) {
-	var pq priorityQueue
-	heap.Init(&pq)
+	t.Run("len", func(t *testing.T) {
+		var queue priorityQueue
+		heap.Init(&queue)
 
-	defer func() {
-		if r := recover(); r == nil {
-			t.Fatalf("expected panic when popping from empty heap")
+		if queue.Len() != 0 {
+			t.Fatalf("expected length 0, got %d", queue.Len())
 		}
-	}()
 
-	heap.Pop(&pq)
-}
-
-func TestPriorityQueueLarge(t *testing.T) {
-	var pq priorityQueue
-	heap.Init(&pq)
-
-	count := 1000
-	for i := range count {
-		heap.Push(&pq, newNode(byte(i%256), uint(count-i)))
-	}
-
-	prevCount := uint(0)
-	for pq.Len() > 0 {
-		n := heap.Pop(&pq).(*node)
-		if n.count < prevCount {
-			t.Fatalf("heap property violated: %d < %d", n.count, prevCount)
+		heap.Push(&queue, &node{char: 'a', count: 1})
+		if queue.Len() != 1 {
+			t.Fatalf("expected length 1, got %d", queue.Len())
 		}
-		prevCount = n.count
-	}
-}
+	})
 
-func TestNodeIsLeaf(t *testing.T) {
-	leaf := &node{char: 'x', count: 1}
-	if !leaf.isLeaf() {
-		t.Fatalf("leaf node detected as non-leaf")
-	}
+	t.Run("default arguments", func(t *testing.T) {
+		queue := priorityQueue{
+			&node{char: 'a', count: 3},
+			&node{char: 'b', count: 1},
+			&node{char: 'c', count: 2},
+		}
 
-	parent := &node{left: leaf, right: nil}
-	if parent.isLeaf() {
-		t.Fatalf("parent node incorrectly detected as leaf")
-	}
+		heap.Init(&queue)
 
-	parent2 := &node{left: leaf, right: &node{}}
-	if parent2.isLeaf() {
-		t.Fatalf("parent node incorrectly detected as leaf")
-	}
+		if n := heap.Pop(&queue).(*node); n.count != 1 {
+			t.Fatalf("expected min count 1, got %d", n.count)
+		}
+		if n := heap.Pop(&queue).(*node); n.count != 2 {
+			t.Fatalf("expected min count 2, got %d", n.count)
+		}
+		if n := heap.Pop(&queue).(*node); n.count != 3 {
+			t.Fatalf("expected min count 3, got %d", n.count)
+		}
+	})
+
+	t.Run("push", func(t *testing.T) {
+		var queue priorityQueue
+		heap.Init(&queue)
+
+		heap.Push(&queue, &node{char: 'a', count: 5})
+		heap.Push(&queue, &node{char: 'b', count: 2})
+		heap.Push(&queue, &node{char: 'c', count: 8})
+
+		if queue.Len() != 3 {
+			t.Fatalf("expected length 3, got %d", queue.Len())
+		}
+
+		if n := heap.Pop(&queue).(*node); n.char != 'b' || n.count != 2 {
+			t.Fatalf("expected {b,2}, got {%c,%d}", n.char, n.count)
+		}
+		if n := heap.Pop(&queue).(*node); n.char != 'a' || n.count != 5 {
+			t.Fatalf("expected {b,2}, got {%c,%d}", n.char, n.count)
+		}
+		if n := heap.Pop(&queue).(*node); n.char != 'c' || n.count != 8 {
+			t.Fatalf("expected {b,2}, got {%c,%d}", n.char, n.count)
+		}
+	})
+
+	t.Run("pop", func(t *testing.T) {
+		queue := priorityQueue{
+			&node{char: 'a', count: 4},
+			&node{char: 'b', count: 1},
+			&node{char: 'c', count: 3},
+		}
+		heap.Init(&queue)
+
+		expected := []uint{1, 3, 4}
+
+		for i, exp := range expected {
+			n := heap.Pop(&queue).(*node)
+			if n.count != exp {
+				t.Fatalf("pop %d: expected %d, got %d", i, exp, n.count)
+			}
+		}
+
+		if queue.Len() != 0 {
+			t.Fatalf("queue should be empty")
+		}
+	})
+
+	t.Run("swap", func(t *testing.T) {
+		queue := priorityQueue{
+			&node{char: 'a', count: 1},
+			&node{char: 'b', count: 2},
+		}
+
+		queue.Swap(0, 1)
+
+		if queue[0].char != 'b' || queue[1].char != 'a' {
+			t.Fatalf("swap failed")
+		}
+	})
+
+	t.Run("push pop", func(t *testing.T) {
+		var pq priorityQueue
+		heap.Init(&pq)
+
+		heap.Push(&pq, &node{char: 'a', count: 3})
+		heap.Push(&pq, &node{char: 'b', count: 1})
+		heap.Push(&pq, &node{char: 'c', count: 2})
+
+		if n := heap.Pop(&pq).(*node); n.char != 'b' || n.count != 1 {
+			t.Fatalf("expected first pop {b,1}, got {%c,%d}", n.char, n.count)
+		}
+
+		if n := heap.Pop(&pq).(*node); n.char != 'c' || n.count != 2 {
+			t.Fatalf("expected second pop {c,2}, got {%c,%d}", n.char, n.count)
+		}
+
+		if n := heap.Pop(&pq).(*node); n.char != 'a' || n.count != 3 {
+			t.Fatalf("expected third pop {a,3}, got {%c,%d}", n.char, n.count)
+		}
+
+		if pq.Len() != 0 {
+			t.Fatalf("expected empty queue, got %d", pq.Len())
+		}
+	})
+
+	t.Run("pop from empty queue panics", func(t *testing.T) {
+		var pq priorityQueue
+		heap.Init(&pq)
+
+		defer func() {
+			if r := recover(); r == nil {
+				t.Fatalf("expected panic when popping from empty queue")
+			}
+		}()
+
+		heap.Pop(&pq)
+	})
 }

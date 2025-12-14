@@ -27,13 +27,10 @@ func (encoder *HuffmanEncoder) Encode() error {
 	if err != nil {
 		return err
 	}
-	if len(frequencies) == 0 {
-		return nil
-	}
 	root := buildTree(frequencies)
 	codes := buildCodes(root)
 	length, _ := calculateContentSize(codes, frequencies)
-	if err := encoder.writeCodes(root); err != nil {
+	if err := encoder.writeHeader(root); err != nil {
 		return err
 	}
 	if err := encoder.encodeContent(codes, length); err != nil {
@@ -42,7 +39,7 @@ func (encoder *HuffmanEncoder) Encode() error {
 	return nil
 }
 
-func (encoder *HuffmanEncoder) writeCodes(root *node) error {
+func (encoder *HuffmanEncoder) writeHeader(root *node) error {
 	b := make([]byte, 2)
 	treeSize := calculateTreeSize(root)
 	binary.LittleEndian.PutUint16(b, treeSize)

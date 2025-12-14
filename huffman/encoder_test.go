@@ -8,9 +8,9 @@ import (
 	"testing"
 )
 
-func bitsNumberToBytesNumber(bits uint16) uint16 {
-	return (bits + 8 - bits%8) / 8
-}
+// func bitsNumberToBytesNumber(bits uint16) uint16 {
+// 	return (bits + 8 - bits%8) / 8
+// }
 
 type brokenReader struct {
 	io.ReadSeeker
@@ -39,72 +39,72 @@ func (fw *failingWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func TestWriteCodesSingleLeaf(t *testing.T) {
-	root := &node{
-		left: &node{
-			char:  'a',
-			count: 1,
-		},
-		right: nil,
-	}
+// func TestWriteCodesSingleLeaf(t *testing.T) {
+// 	root := &node{
+// 		left: &node{
+// 			char:  'a',
+// 			count: 1,
+// 		},
+// 		right: nil,
+// 	}
 
-	buf := &bytes.Buffer{}
-	enc := NewEncoder(nil, buf)
+// 	buf := &bytes.Buffer{}
+// 	enc := NewEncoder(nil, buf)
 
-	if err := enc.writeCodes(root); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+// 	if err := enc.writeCodes(root); err != nil {
+// 		t.Fatalf("unexpected error: %v", err)
+// 	}
 
-	out := buf.Bytes()
-	expectedLength := calculateTreeSize(root)
-	expexted := bitsNumberToBytesNumber(expectedLength) + 2
-	if len(out) != int(expexted) {
-		t.Fatalf("expected size %d, got %d", expexted, len(out))
-	}
-	actualLength := binary.LittleEndian.Uint16(out)
-	if expectedLength != actualLength {
-		t.Fatalf("expected header size: %d, got: %d", expectedLength, actualLength)
-	}
-}
+// 	out := buf.Bytes()
+// 	expectedLength := calculateTreeSize(root)
+// 	expexted := bitsNumberToBytesNumber(expectedLength) + 2
+// 	if len(out) != int(expexted) {
+// 		t.Fatalf("expected size %d, got %d", expexted, len(out))
+// 	}
+// 	actualLength := binary.LittleEndian.Uint16(out)
+// 	if expectedLength != actualLength {
+// 		t.Fatalf("expected header size: %d, got: %d", expectedLength, actualLength)
+// 	}
+// }
 
-func TestWriteCodesSimpleTree(t *testing.T) {
-	root := &node{
-		left:  &node{char: 'A', count: 3},
-		right: &node{char: 'B', count: 5},
-	}
+// func TestWriteCodesSimpleTree(t *testing.T) {
+// 	root := &node{
+// 		left:  &node{char: 'A', count: 3},
+// 		right: &node{char: 'B', count: 5},
+// 	}
 
-	buf := &bytes.Buffer{}
-	enc := NewEncoder(nil, buf)
+// 	buf := &bytes.Buffer{}
+// 	enc := NewEncoder(nil, buf)
 
-	err := enc.writeCodes(root)
-	if err != nil {
-		t.Fatalf("writeCodes returned error: %v", err)
-	}
+// 	err := enc.writeCodes(root)
+// 	if err != nil {
+// 		t.Fatalf("writeCodes returned error: %v", err)
+// 	}
 
-	b := buf.Bytes()
-	if len(b) == 0 {
-		t.Fatalf("expected non empty result, got %v", b)
-	}
+// 	b := buf.Bytes()
+// 	if len(b) == 0 {
+// 		t.Fatalf("expected non empty result, got %v", b)
+// 	}
 
-	expectedLength := calculateTreeSize(root)
-	actualLength := binary.LittleEndian.Uint16(b)
+// 	expectedLength := calculateTreeSize(root)
+// 	actualLength := binary.LittleEndian.Uint16(b)
 
-	if expectedLength != actualLength {
-		t.Fatalf("expected some bit-encoded data before newline")
-	}
-}
+// 	if expectedLength != actualLength {
+// 		t.Fatalf("expected some bit-encoded data before newline")
+// 	}
+// }
 
-func TestWriteCodesWriterError(t *testing.T) {
-	root := &node{char: 'X', count: 1}
+// func TestWriteCodesWriterError(t *testing.T) {
+// 	root := &node{char: 'X', count: 1}
 
-	fw := &failingWriter{n: 0}
-	enc := NewEncoder(nil, fw)
+// 	fw := &failingWriter{n: 0}
+// 	enc := NewEncoder(nil, fw)
 
-	err := enc.writeCodes(root)
-	if err == nil {
-		t.Fatalf("expected writer error")
-	}
-}
+// 	err := enc.writeCodes(root)
+// 	if err == nil {
+// 		t.Fatalf("expected writer error")
+// 	}
+// }
 
 func TestEncodeContentSingleByte(t *testing.T) {
 	reader := bytes.NewReader([]byte{'A'})

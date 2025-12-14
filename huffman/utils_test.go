@@ -10,29 +10,6 @@ func leaf(char byte, count uint) *node {
 	return &node{char: char, count: count}
 }
 
-func sumLeafCounts(n *node) uint {
-	if n == nil {
-		return 0
-	}
-	if n.isLeaf() {
-		return n.count
-	}
-	return sumLeafCounts(n.left) + sumLeafCounts(n.right)
-}
-
-func validateInternalCounts(t *testing.T, n *node) uint {
-	if n.isLeaf() {
-		return n.count
-	}
-	left := validateInternalCounts(t, n.left)
-	right := validateInternalCounts(t, n.right)
-
-	if n.count != left+right {
-		t.Fatalf("invalid internal node count: got %d, expected %d", n.count, left+right)
-	}
-	return n.count
-}
-
 func TestToPriorityQueue(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		pq := toPriorityQueue(map[byte]uint{})
@@ -90,64 +67,81 @@ func TestToPriorityQueue(t *testing.T) {
 	})
 }
 
-func TestBuildTreeSingleNode(t *testing.T) {
-	freq := map[byte]uint{
-		'a': 5,
-	}
+func TestBuildTree(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		if root := buildTree(map[byte]uint{}); root != nil {
+			t.Fatalf("non <nil> result on empty frequency map: %v", root)
+		}
+	})
 
-	root := buildTree(freq)
+	t.Run("single node", func(t *testing.T) {
+		root := buildTree(map[byte]uint{'a': 5})
 
-	if root == nil {
-		t.Fatal("expected non-nil root")
-	}
-	if root.isLeaf() {
-		t.Fatalf("expected internal node, got leaf node")
-	}
-	if root.left.char != 'a' || root.left.count != 5 {
-		t.Fatalf("unexpected values: got (%c,%d)", root.char, root.count)
-	}
-}
+		if root == nil {
+			t.Fatal("expected non-nil root")
+		}
+		if root.isLeaf() {
+			t.Fatalf("expected internal node, got leaf node")
+		}
+		if root.left.char != 'a' || root.left.count != 5 {
+			t.Fatalf("unexpected values: got (%c,%d)", root.char, root.count)
+		}
+	})
 
-func TestBuildTreeBasic(t *testing.T) {
-	freq := map[byte]uint{
-		'a': 5,
-		'b': 7,
-		'c': 10,
-		'd': 15,
-	}
+	t.Run("two nodes", func(t *testing.T) {
+		root := buildTree(map[byte]uint{'a': 2, 'b': 3})
+		if root == nil {
+			t.Fatal("tree root is nil")
+		}
+		if root.count != 5 {
+			t.Fatalf("invalid root count: got %d, expected %d", root.count, 5)
+		}
 
-	root := buildTree(freq)
+		if !root.left.isLeaf() || root.left.char != 'a' {
+			t.Fatal("invalid tree structure, root.left expected to be 'a'")
+		}
+		if !root.right.isLeaf() || root.right.char != 'b' {
+			t.Fatal("invalid tree structure, root.right expected to be 'b'")
+		}
+	})
 
-	if root == nil {
-		t.Fatalf("tree root is nil")
-	}
+	t.Run("tree", func(t *testing.T) {
+		freq := map[byte]uint{
+			'a': 5,
+			'b': 7,
+			'c': 10,
+			'd': 15,
+		}
 
-	expected := uint(5 + 7 + 10 + 15)
-	if root.count != expected {
-		t.Fatalf("invalid root count: got %d, expected %d", root.count, expected)
-	}
+		root := buildTree(freq)
 
-	validateInternalCounts(t, root)
-}
+		if root == nil {
+			t.Fatal("tree root is nil")
+		}
 
-func TestBuildTreeDeterministic(t *testing.T) {
-	freq1 := map[byte]uint{
-		'a': 5, 'b': 9, 'c': 12, 'd': 13,
-	}
-
-	freq2 := map[byte]uint{
-		'd': 13, 'c': 12, 'b': 9, 'a': 5,
-	}
-
-	tree1 := buildTree(freq1)
-	tree2 := buildTree(freq2)
-
-	sum1 := sumLeafCounts(tree1)
-	sum2 := sumLeafCounts(tree2)
-
-	if sum1 != sum2 {
-		t.Fatalf("trees differ: leaf sums %d vs %d", sum1, sum2)
-	}
+		expected := uint(5 + 7 + 10 + 15)
+		if root.count != expected {
+			t.Fatalf("invalid root count: got %d, expected %d", root.count, expected)
+		}
+		if !root.left.isLeaf() || root.left.char != 'd' {
+			t.Fatal("invalid tree structure, root.left expected to be 'd'")
+		}
+		if root.right.isLeaf() {
+			t.Fatal("invalid tree structure, root.right expected to be internal")
+		}
+		if !root.right.left.isLeaf() || root.right.left.char != 'c' {
+			t.Fatal("invalid tree structure, root.right.left expected to be 'c'")
+		}
+		if root.right.right.isLeaf() {
+			t.Fatal("invalid tree structure, root.right.right expected to be internal")
+		}
+		if !root.right.right.left.isLeaf() || root.right.right.left.char != 'a' {
+			t.Fatal("invalid tree structure, root.right.right.left expected to be 'a'")
+		}
+		if !root.right.right.right.isLeaf() || root.right.right.right.char != 'b' {
+			t.Fatal("invalid tree structure, root.right.right.right expected to be 'b'")
+		}
+	})
 }
 
 func TestBuildCodesSingleLeaf(t *testing.T) {
@@ -166,16 +160,16 @@ func TestBuildCodesSingleLeaf(t *testing.T) {
 
 func TestBuildCodesTwoLeaves(t *testing.T) {
 	root := &node{
-		left:  leaf('A', 2),
-		right: leaf('B', 3),
+		left:  &node{char: 'a', count: 2},
+		right: &node{char: 'b', count: 3},
 	}
 
 	codes := buildCodes(root)
 
-	if codes['A'] != "1" {
+	if codes['a'] != "1" {
 		t.Fatalf("expected A = 1, got %q", codes['A'])
 	}
-	if codes['B'] != "0" {
+	if codes['b'] != "0" {
 		t.Fatalf("expected B = 0, got %q", codes['B'])
 	}
 }

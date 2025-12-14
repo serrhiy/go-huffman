@@ -17,6 +17,9 @@ func toPriorityQueue(frequencies map[byte]uint) priorityQueue {
 }
 
 func buildTree(frequencies map[byte]uint) *node {
+	if len(frequencies) == 0 {
+		return nil
+	}
 	queue := toPriorityQueue(frequencies)
 	if queue.Len() == 1 {
 		left := heap.Pop(&queue).(*node)

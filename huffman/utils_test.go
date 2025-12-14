@@ -106,6 +106,13 @@ func TestBuildTree(t *testing.T) {
 	})
 
 	t.Run("tree", func(t *testing.T) {
+		//        (*,37)
+		//      /         \
+		// D(15)          (*,22)
+		//                /     \
+		//           C(10)      (*,12)
+		//                      /    \
+		//                  A(5)      B(7)
 		freq := map[byte]uint{
 			'a': 5,
 			'b': 7,
@@ -144,34 +151,83 @@ func TestBuildTree(t *testing.T) {
 	})
 }
 
-func TestBuildCodesSingleLeaf(t *testing.T) {
-	root := leaf('x', 5)
+func TestBuildCodes(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		if codes := buildCodes(nil); len(codes) != 0 {
+			t.Fatal("empty codes expected on <nil> root")
+		}
+	})
 
-	codes := buildCodes(root)
+	// this case is unreachable when the input originates from buildTree
+	t.Run("single leaf and no internal node", func(t *testing.T) {
+		root := &node{char: 'a', count: 10}
+		codes := buildCodes(root)
+		if len(codes) != 1 {
+			t.Fatalf("expected 1 code, got %d", len(codes))
+		}
 
-	if len(codes) != 1 {
-		t.Fatalf("expected 1 code, got %d", len(codes))
-	}
+		if code, ok := codes['a']; !ok || code != "" {
+			t.Fatalf("single leaf must have empty code, got %q, %v", code, codes)
+		}
+	})
 
-	if code := codes['x']; code != "" {
-		t.Fatalf("single leaf must have empty code, got %q", code)
-	}
-}
+	t.Run("two leafes", func(t *testing.T) {
+		root := &node{
+			left: &node{char: 'a', count: 10},
+			right: &node{char: 'b', count: 15},
+		}
+		codes := buildCodes(root)
 
-func TestBuildCodesTwoLeaves(t *testing.T) {
-	root := &node{
-		left:  &node{char: 'a', count: 2},
-		right: &node{char: 'b', count: 3},
-	}
+		if len(codes) != 2 {
+			t.Fatalf("invalid codes map size, expected: %d, got: %d", 1, len(codes))
+		}
+		if code, ok := codes['a']; !ok || code != "1" {
+			t.Fatalf("invalide code map builded, expected: %s, got: %s", "1", code)
+		}
+		if code, ok := codes['b']; !ok || code != "0" {
+			t.Fatalf("invalide code map builded, expected: %s, got: %s", "0", code)
+		}
+	})
 
-	codes := buildCodes(root)
+	t.Run("tree", func(t *testing.T) {
+		//        (*,37)
+		//    1 /         \ 0
+		// D(15)          (*,22)
+		//              1 /     \ 0
+		//           C(10)      (*,12)
+		//                    1 /    \ 0
+		//                  A(5)      B(7)
+		root := &node{
+			left: &node{char: 'd', count: 15},
+			right: &node{
+				count: 22,
+				left: &node{char: 'c', count: 10},
+				right: &node{
+					count: 12,
+					left: &node{char: 'a', count: 5},
+					right: &node{char: 'b', count: 7},
+				},
+			},
+		}
 
-	if codes['a'] != "1" {
-		t.Fatalf("expected A = 1, got %q", codes['A'])
-	}
-	if codes['b'] != "0" {
-		t.Fatalf("expected B = 0, got %q", codes['B'])
-	}
+		codes := buildCodes(root)
+		if len(codes) != 4 {
+			t.Fatalf("invalid codes map size, expected: %d, got: %d", 4, len(codes))
+		}
+
+		expected := map[byte]string{
+			'd': "1",
+			'c': "01",
+			'a': "001",
+			'b': "000",
+		}
+
+		for char, code := range expected {
+			if actual, ok := codes[char]; !ok || actual != code {
+				t.Fatalf("invalud code builded, expected: %s, actual: %s", code, actual)
+			}
+		}
+	})
 }
 
 func TestBuildCodesMultiLevel(t *testing.T) {

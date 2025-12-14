@@ -81,8 +81,8 @@ func (decoder *HuffmanDecoder) Decode() error {
 	}
 
 	buffer := make([]byte, 8)
-	if _, err := reader.Read(buffer); err != nil {
-		return err
+	if _, err := io.ReadFull(reader, buffer); err != nil {
+		return errors.New("invalid file structure")
 	}
 	length := binary.LittleEndian.Uint64(buffer)
 	codes := buildReverseCodes(root)
@@ -93,6 +93,9 @@ func (decoder *HuffmanDecoder) Decode() error {
 		bit, err := reader.ReadBit()
 		total += 1
 		if err != nil {
+			if err == io.EOF {
+				break
+			}
 			return err
 		}
 		if bit == 1 {

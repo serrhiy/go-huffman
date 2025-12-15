@@ -1,7 +1,6 @@
 package main
 
 import (
-	"path/filepath"
 	"testing"
 )
 
@@ -9,8 +8,7 @@ func TestGetArgumentsEncode(t *testing.T) {
 	input := "/tmp/input.txt"
 
 	t.Run("empty input", func(t *testing.T) {
-		_, err := getArgumentsEncode("", "/tmp/out.huff")
-		if err == nil {
+		if _, err := getArgumentsEncode("", "/tmp/out.huff"); err == nil {
 			t.Fatal("expected error for empty input")
 		}
 	})
@@ -20,7 +18,7 @@ func TestGetArgumentsEncode(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		expected := filepath.Join(filepath.Dir(input), "input"+OutputExtension)
+		expected := "/tmp/input.hfm"
 		if args.outputFile != expected {
 			t.Fatalf("expected output '%s', got '%s'", expected, args.outputFile)
 		}
@@ -39,21 +37,43 @@ func TestGetArgumentsEncode(t *testing.T) {
 			t.Fatalf("expected output '%s', got '%s'", output, args.outputFile)
 		}
 	})
+
+	t.Run("auto output without extension", func(t *testing.T) {
+		input := "/tmp/file_without_ext"
+		args, err := getArgumentsEncode(input, "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		expected := "/tmp/file_without_ext.hfm"
+		if args.outputFile != expected {
+			t.Fatalf("expected %q, got %q", expected, args.outputFile)
+		}
+	})
+
+	t.Run("auto output with complex name", func(t *testing.T) {
+		input := "/some/dir/myfile.data.txt"
+		args, err := getArgumentsEncode(input, "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		expected := "/some/dir/myfile.data.hfm"
+		if args.outputFile != expected {
+			t.Fatalf("expected %q, got %q", expected, args.outputFile)
+		}
+	})
 }
 
 func TestGetArgumentsDecode(t *testing.T) {
 	input := "/tmp/input.huff"
 
 	t.Run("empty input", func(t *testing.T) {
-		_, err := getArgumentsDecode("", "/tmp/out.txt")
-		if err == nil {
+		if _, err := getArgumentsDecode("", "/tmp/out.txt"); err == nil {
 			t.Fatal("expected error for empty input")
 		}
 	})
 
 	t.Run("empty output", func(t *testing.T) {
-		_, err := getArgumentsDecode(input, "")
-		if err == nil {
+		if _, err := getArgumentsDecode(input, ""); err == nil {
 			t.Fatal("expected error for empty output")
 		}
 	})
@@ -74,58 +94,37 @@ func TestGetArgumentsDecode(t *testing.T) {
 }
 
 func TestGetArguments(t *testing.T) {
-	t.Run("invalid service", func(t *testing.T) {
-		_, err := getArguments("in", "out", "x")
+	t.Run("both encode and decode set", func(t *testing.T) {
+		_, err := getArguments("in.txt", "in.hfm", "")
 		if err == nil {
-			t.Fatal("expected error for invalid service")
+			t.Fatal("expected error, got nil")
 		}
 	})
 
-	t.Run("encode service with empty output", func(t *testing.T) {
-		input := "/home/user/file.txt"
-		args, err := getArguments(input, "", "e")
+	t.Run("neither encode nor decode set", func(t *testing.T) {
+		_, err := getArguments("", "", "")
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+	})
+
+	t.Run("encode path only", func(t *testing.T) {
+		args, err := getArguments("input.txt", "", "")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		expected := filepath.Join(filepath.Dir(input), "file"+OutputExtension)
-		if args.outputFile != expected {
-			t.Fatalf("expected output '%s', got '%s'", expected, args.outputFile)
+		if args.inputFile != "input.txt" {
+			t.Fatalf("unexpected input: %q", args.inputFile)
 		}
 	})
 
-	t.Run("decode service normal", func(t *testing.T) {
-		input := "/tmp/input.huff"
-		output := "/tmp/out.txt"
-		args, err := getArguments(input, output, "d")
+	t.Run("decode path only", func(t *testing.T) {
+		args, err := getArguments("", "input.hfm", "out.txt")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if args.inputFile != input || args.outputFile != output {
-			t.Fatalf("expected args (%s, %s), got (%s, %s)", input, output, args.inputFile, args.outputFile)
+		if args.inputFile != "input.hfm" || args.outputFile != "out.txt" {
+			t.Fatalf("unexpected args: %+v", args)
 		}
 	})
-}
-
-func TestGetArgumentsEncode_FileWithoutExt(t *testing.T) {
-	input := "/tmp/file_without_ext"
-	args, err := getArgumentsEncode(input, "")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	expected := filepath.Join(filepath.Dir(input), "file_without_ext"+OutputExtension)
-	if args.outputFile != expected {
-		t.Fatalf("expected output '%s', got '%s'", expected, args.outputFile)
-	}
-}
-
-func TestGetArgumentsEncode_ComplexName(t *testing.T) {
-	input := "/some/dir/myfile.data.txt"
-	args, err := getArgumentsEncode(input, "")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	expected := filepath.Join(filepath.Dir(input), "myfile.data"+OutputExtension)
-	if args.outputFile != expected {
-		t.Fatalf("expected output '%s', got '%s'", expected, args.outputFile)
-	}
 }

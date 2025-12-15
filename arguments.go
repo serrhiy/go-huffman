@@ -19,7 +19,7 @@ func getArgumentsEncode(input, output string) (*arguments, error) {
 		ext := filepath.Ext(base)
 		name := base[:len(base)-len(ext)]
 		dir := filepath.Dir(input)
-		otuputPath := filepath.Join(dir, name + OutputExtension)
+		otuputPath := filepath.Join(dir, name+OutputExtension)
 		return &arguments{input, otuputPath}, nil
 	}
 	return &arguments{input, output}, nil
@@ -35,15 +35,15 @@ func getArgumentsDecode(input, output string) (*arguments, error) {
 	return &arguments{input, output}, nil
 }
 
-var parsers = map[string]func(string, string) (*arguments, error){
-	"e": getArgumentsEncode,
-	"d": getArgumentsDecode,
-}
-
-func getArguments(input, output, service string) (*arguments, error) {
-	parser, ok := parsers[service]
-	if !ok {
-		return nil, errors.New("invalid service parameter: " + service)
+func getArguments(encode, decode, output string) (*arguments, error) {
+	if len(encode) > 0 && len(decode) > 0 {
+		return nil, errors.New("both encode and decode paths are set, specify only one")
 	}
-	return parser(input, output)
+	if len(encode) == 0 && len(decode) == 0 {
+		return nil, errors.New("either encode or decode path must be specified")
+	}
+	if len(encode) > 0 {
+		return getArgumentsEncode(encode, output)
+	}
+	return getArgumentsDecode(decode, output)
 }

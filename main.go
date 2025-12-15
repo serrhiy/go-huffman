@@ -10,12 +10,12 @@ import (
 
 const OutputExtension = ".hfm"
 
-var input = flag.String("input", "", "path to the input file")
-var output = flag.String("output", "", "path to the output file")
-var service = flag.String("service", "e", "e - encode, d - decode")
+var output = flag.String("o", "", "path to the output file")
+var encode = flag.String("e", "", "encode file")
+var decode = flag.String("d", "", "decode file")
 
 func start() error {
-	arguments, err := getArguments(*input, *output, *service)
+	arguments, err := getArguments(*encode, *decode, *output)
 	if err != nil {
 		return err
 	}
@@ -32,7 +32,7 @@ func start() error {
 	}
 	defer outfile.Close()
 
-	if *service == "e" {
+	if len(*encode) > 0 {
 		encoder := huffman.NewEncoder(infile, outfile)
 		err = encoder.Encode()
 		if err != nil {
@@ -52,9 +52,11 @@ func start() error {
 func main() {
 	flag.Parse()
 
-	err := start()
-	if err != nil {
+	if err := start(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error occurred: %v\n", err)
+		if err == huffman.ErrInvalidStructure {
+			os.Remove(*output)
+		}
 		os.Exit(1)
 	}
 }

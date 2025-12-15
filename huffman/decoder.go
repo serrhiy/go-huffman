@@ -9,6 +9,8 @@ import (
 	"github.com/serrhiy/go-huffman/bitio"
 )
 
+var ErrInvalidStructure = errors.New("invalid file structure")
+
 type HuffmanDecoder struct {
 	reader *bufio.Reader
 	writer *bufio.Writer
@@ -32,7 +34,7 @@ func _readTree(reader *bitio.Reader, length uint16) (*node, error) {
 		readed += 1
 		if bit == 1 {
 			if readed+8 > length {
-				return nil, errors.New("invalid header structure")
+				return nil, ErrInvalidStructure
 			}
 			b, err := reader.ReadByte()
 			if err != nil {
@@ -72,7 +74,7 @@ func (decoder *HuffmanDecoder) Decode() error {
 	root, err := readTree(reader)
 	if err != nil {
 		if err == io.EOF {
-			return errors.New("invalid file structure")
+			return ErrInvalidStructure
 		}
 		return err
 	}
@@ -82,7 +84,7 @@ func (decoder *HuffmanDecoder) Decode() error {
 
 	buffer := make([]byte, 8)
 	if _, err := io.ReadFull(reader, buffer); err != nil {
-		return errors.New("invalid file structure")
+		return ErrInvalidStructure
 	}
 	length := binary.LittleEndian.Uint64(buffer)
 	codes := buildReverseCodes(root)
@@ -94,6 +96,9 @@ func (decoder *HuffmanDecoder) Decode() error {
 		total += 1
 		if err != nil {
 			if err == io.EOF {
+				if total != length {
+					return ErrInvalidStructure
+				}
 				break
 			}
 			return err

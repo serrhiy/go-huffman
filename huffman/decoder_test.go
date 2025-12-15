@@ -118,6 +118,18 @@ func TestDecode(t *testing.T) {
 		}
 	})
 
+	t.Run("0 chars", func(t *testing.T) {
+		reader := bytes.NewReader([]byte{9: 0})
+		writer := &bytes.Buffer{}
+		decoder := NewDecoder(reader, writer)
+		if err := decoder.Decode(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if writer.Len() > 0 {
+			t.Fatalf("expected empty result, got: %d", writer.Len())
+		}
+	})
+
 	t.Run("error propagation", func(t *testing.T) {
 		source := []byte{10, 0, 0b01011000, 0b01000000, 1, 0, 0, 0, 0, 0, 0, 0, 0b10000000}
 		reader := &brokenReader{limit: 12, reader: bytes.NewReader(source)}
@@ -142,4 +154,41 @@ func TestDecode(t *testing.T) {
 	})
 
 	// other cases should be covered in fuzzing tests
+}
+
+func FuzzEncodeDecode(f *testing.F) {
+	testcases := []string{
+		"Hello world!",
+		"",
+		" ",
+		"aaaaaaaaaaaaaaaaaaaaaaa",
+		"abcdefghijklmnopqrstuvwxyz",
+		"aaaaaaaabbbbbbbbbbbbbbbbb",
+		string([]byte{0, 234, 14, 45, 13, 78, 32, 14}),
+		"Duis quis quam sit amet diam semper congue. Donec ac auctor lectus",
+		string(bytes.Repeat([]byte("abc"), 4096)),
+	}
+
+	for _, tc := range testcases {
+		f.Add(tc)
+	}
+
+	f.Fuzz(func(t *testing.T, a string) {
+		b := []byte(a)
+		reader := bytes.NewReader(b)
+		writer := &bytes.Buffer{}
+		encoder := NewEncoder(reader, writer)
+		if err := encoder.Encode(); err != nil {
+			t.Fatalf("unexpected error while encoding: %v", err)
+		}
+		reader = bytes.NewReader(writer.Bytes())
+		writer = &bytes.Buffer{}
+		decoder := NewDecoder(reader, writer)
+		if err := decoder.Decode(); err != nil {
+			t.Fatalf("unexpected error while decoding: %v, input: %v", err, b)
+		}
+		if !bytes.Equal(b, writer.Bytes()) {
+			t.Fatalf("invalid encoding decoding, input: %v, output: %v", b, writer.Bytes())
+		}
+	})
 }

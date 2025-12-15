@@ -22,7 +22,7 @@ func _readTree(reader *bitio.Reader, length uint16) (*node, error) {
 	var readed uint16 = 0
 	var next func() (*node, error)
 	next = func() (*node, error) {
-		if readed > length {
+		if readed >= length {
 			return nil, nil
 		}
 		bit, err := reader.ReadBit()

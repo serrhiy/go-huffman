@@ -3,9 +3,10 @@ package main
 import (
 	"bytes"
 	"io"
-	"math/rand/v2"
 	"os"
 	"testing"
+
+	"github.com/serrhiy/go-huffman/benchkit"
 )
 
 type tempFiles struct {
@@ -109,38 +110,21 @@ func TestGoHuffman(t *testing.T) {
 	}
 }
 
-func benchDataText(size int) string {
-	b := make([]byte, size)
-	for i := range b {
-		b[i] = byte('a' + i%26)
-	}
-	return string(b)
-}
-
-func benchDataRandom(size int) string {
-	seed := [32]byte{31: 207}
-	chacha := rand.NewChaCha8(seed)
-	b := make([]byte, size)
-	chacha.Read(b)
-	return string(b)
-}
-
 func BenchmarkGoHuffman(b *testing.B) {
 	cases := []struct {
 		name string
 		data string
 	}{
-		{"small_text", benchDataText(1 << 10)},
-		{"medium_text", benchDataText(1 << 16)},
-		{"large_text", benchDataText(1 << 20)},
+		{"small_text", benchkit.Text(1 << 10)},
+		{"medium_text", benchkit.Text(1 << 16)},
+		{"large_text", benchkit.Text(1 << 20)},
 		{"repeating", string(bytes.Repeat([]byte{'a'}, 1<<20))},
-		{"random", benchDataRandom(1 << 20)},
+		{"random", benchkit.Random(1 << 20)},
 	}
 
 	for _, tc := range cases {
 		b.Run(tc.name, func(b *testing.B) {
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				if _, err := encodeDecode(tc.data); err != nil {
 					b.Fatal(err)
 				}

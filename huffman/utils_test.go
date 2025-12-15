@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/serrhiy/go-huffman/benchkit"
 	"github.com/serrhiy/go-huffman/bitio"
 )
 
@@ -373,6 +374,41 @@ func FuzzBuldCodesPrefix(f *testing.F) {
 			}
 		}
 	})
+}
+
+func BenchmarkBuildTree(b *testing.B) {
+	cases := []struct {
+		name string
+		data string
+	}{
+		{"range_1", benchkit.Range(0, 17)},
+		{"range_2", benchkit.Range(0, 34)},
+		{"range_3", benchkit.Range(0, 51)},
+		{"range_4", benchkit.Range(0, 68)},
+		{"range_5", benchkit.Range(0, 85)},
+		{"range_6", benchkit.Range(0, 102)},
+		{"range_7", benchkit.Range(0, 119)},
+		{"range_8", benchkit.Range(0, 136)},
+		{"range_9", benchkit.Range(0, 153)},
+		{"range_10", benchkit.Range(0, 170)},
+		{"range_11", benchkit.Range(0, 187)},
+		{"range_12", benchkit.Range(0, 204)},
+		{"range_13", benchkit.Range(0, 221)},
+		{"range_14", benchkit.Range(0, 238)},
+		{"range_15", benchkit.Range(0, 256)},
+	}
+	for _, tc := range cases {
+		b.Run(tc.name, func(b *testing.B) {
+			reader := bytes.NewBufferString(tc.data)
+			freq, err := getFrequencyMap(reader)
+			if err != nil {
+				b.Fatalf("unexpected error while building frequency map: %v", err)
+			}
+			for b.Loop() {
+				buildTree(freq)
+			}
+		})
+	}
 }
 
 func TestCalculateTreeSize(t *testing.T) {

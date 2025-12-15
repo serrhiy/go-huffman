@@ -14,6 +14,16 @@ var output = flag.String("o", "", "path to the output file")
 var encode = flag.String("e", "", "encode file")
 var decode = flag.String("d", "", "decode file")
 
+func encodeFile(in, out *os.File) error {
+	encoder := huffman.NewEncoder(in, out)
+	return encoder.Encode()
+}
+
+func decodeFile(in, out *os.File) error {
+	decoder := huffman.NewDecoder(in, out)
+	return decoder.Decode()
+}
+
 func start() error {
 	arguments, err := getArguments(*encode, *decode, *output)
 	if err != nil {
@@ -33,20 +43,9 @@ func start() error {
 	defer outfile.Close()
 
 	if len(*encode) > 0 {
-		encoder := huffman.NewEncoder(infile, outfile)
-		err = encoder.Encode()
-		if err != nil {
-			return err
-		}
-	} else {
-		decoder := huffman.NewDecoder(infile, outfile)
-		err := decoder.Decode()
-		if err != nil {
-			return err
-		}
+		return encodeFile(infile, outfile)
 	}
-
-	return nil
+	return decodeFile(infile, outfile)
 }
 
 func main() {

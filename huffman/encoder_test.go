@@ -4,24 +4,26 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"io"
 	"testing"
 
 	"github.com/serrhiy/go-huffman/bitio"
 )
 
 type failingWriter struct {
-	n int
+	limit  int
+	writer io.Writer
 }
 
-func (fw *failingWriter) Write(p []byte) (int, error) {
-	if fw.n <= 0 {
+func (w *failingWriter) Write(p []byte) (int, error) {
+	if w.limit <= 0 {
 		return 0, errors.New("write failed")
 	}
-	if len(p) > fw.n {
-		p = p[:fw.n]
+	if len(p) > w.limit {
+		p = p[:w.limit]
 	}
-	fw.n -= len(p)
-	return len(p), nil
+	w.limit -= len(p)
+	return w.writer.Write(p)
 }
 
 func TestWriteHeader(t *testing.T) {
@@ -45,8 +47,7 @@ func TestWriteHeader(t *testing.T) {
 		root := &node{
 			left: &node{char: 'a', count: 10},
 		}
-		fw := &failingWriter{n: 3}
-		enc := NewEncoder(nil, fw)
+		enc := NewEncoder(nil, &failingWriter{limit: 3, writer: &bytes.Buffer{}})
 		err := enc.writeHeader(root)
 		if err == nil {
 			t.Fatalf("expected writer error")
@@ -162,7 +163,7 @@ func TestEncodeContent(t *testing.T) {
 
 	t.Run("error propagation", func(t *testing.T) {
 		reader := bytes.NewReader([]byte("aaa"))
-		encoder := NewEncoder(reader, &failingWriter{n: 3})
+		encoder := NewEncoder(reader, &failingWriter{limit: 3, writer: &bytes.Buffer{}})
 		codes := map[byte]string{'a': "0"}
 		freq := map[byte]uint{'a': 3}
 		if err := encoder.encodeContent(codes, freq); err == nil {
@@ -194,11 +195,9 @@ func TestEncode(t *testing.T) {
 
 	t.Run("error propagation", func(t *testing.T) {
 		reader := bytes.NewReader([]byte("aaa"))
-		fw := &failingWriter{n: 5}
-		encoder := NewEncoder(reader, fw)
+		encoder := NewEncoder(reader, &failingWriter{limit: 3, writer: &bytes.Buffer{}})
 
-		err := encoder.Encode()
-		if err == nil {
+		if err := encoder.Encode(); err == nil {
 			t.Fatalf("expected writer error")
 		}
 	})

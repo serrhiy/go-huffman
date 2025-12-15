@@ -5,6 +5,7 @@ import (
 	"container/heap"
 	"errors"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/serrhiy/go-huffman/bitio"
@@ -335,6 +336,40 @@ func TestBuildCodes(t *testing.T) {
 		for char, code := range expected {
 			if actual, ok := codes[char]; !ok || actual != code {
 				t.Fatalf("invalud code builded, expected: %s, actual: %s", code, actual)
+			}
+		}
+	})
+}
+
+func FuzzBuldCodesPrefix(f *testing.F) {
+	testcases := []string{
+		"",
+		"q",
+		"Lorem ipsum dolor sit amet, consectetur adipiscing elit. In ac nunc accumsan",
+		"aaaaaaaaaaaaaaaaaaaaaaaa",
+		"aaaaaaaaaaaaaabbbbbbbbbbbbbbb",
+		string([]byte{1, 234, 12, 34, 42, 142, 123}),
+	}
+	for _, tc := range testcases {
+		f.Add(tc)
+	}
+
+	f.Fuzz(func(t *testing.T, a string) {
+		reader := bytes.NewBufferString(a)
+		freq, err := getFrequencyMap(reader)
+		if err != nil {
+			t.Fatalf("unexpected error while building frequency map: %v", err)
+		}
+		codes := buildCodes(buildTree(freq))
+		for char1, code1 := range codes {
+			for char2, code2 := range codes {
+				if strings.HasPrefix(code1, code2) && char1 != char2 {
+					t.Fatalf(
+						"prefix code invariant violated: char %q has code %q, char %q has code %q",
+						char1, code1,
+						char2, code2,
+					)
+				}
 			}
 		}
 	})

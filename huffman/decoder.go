@@ -87,13 +87,17 @@ func (decoder *HuffmanDecoder) Decode() error {
 		return ErrInvalidStructure
 	}
 	length := binary.LittleEndian.Uint64(buffer)
-	codes := buildReverseCodes(root)
 	writer := bufio.NewWriter(decoder.writer)
-	code := ""
+	current := root
 	var total uint64 = 0
+
+	// if file was corrupted, not normal case
+	if root == nil && length != 0 {
+		return ErrInvalidStructure
+	}
+
 	for total < length {
 		bit, err := reader.ReadBit()
-		total += 1
 		if err != nil {
 			if err == io.EOF {
 				if total != length {
@@ -103,14 +107,19 @@ func (decoder *HuffmanDecoder) Decode() error {
 			}
 			return err
 		}
+		total += 1
 		if bit == 1 {
-			code += "1"
+			current = current.left
 		} else {
-			code += "0"
+			current = current.right
 		}
-		if char, ok := codes[code]; ok {
-			writer.WriteByte(char)
-			code = ""
+		if current == nil {
+			return ErrInvalidStructure
+		}
+
+		if current.isLeaf() {
+			writer.WriteByte(current.char)
+			current = root
 		}
 	}
 	return writer.Flush()

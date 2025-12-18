@@ -95,24 +95,6 @@ func buildCodes(root *node) map[byte]string {
 	return table
 }
 
-func _buildReverseCodes(root *node, prefix string, table map[string]byte) {
-	if root == nil {
-		return
-	}
-	if root.left == nil && root.right == nil {
-		table[prefix] = root.char
-		return
-	}
-	_buildReverseCodes(root.left, prefix+"1", table)
-	_buildReverseCodes(root.right, prefix+"0", table)
-}
-
-func buildReverseCodes(root *node) map[string]byte {
-	table := make(map[string]byte, 1<<7)
-	_buildReverseCodes(root, "", table)
-	return table
-}
-
 func writeCodes(root *node, writer *bitio.Writer) error {
 	if root == nil {
 		return nil

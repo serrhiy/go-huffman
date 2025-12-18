@@ -192,3 +192,29 @@ func FuzzEncodeDecode(f *testing.F) {
 		}
 	})
 }
+
+func FuzzDecodeGarbage(f *testing.F) {
+	testcases := [][]byte{
+		{},
+		{0x00},
+		{0xff},
+		{0x00, 0x00, 0x00},
+		{0xff, 0xff, 0xff},
+		{1, 2, 3, 4, 5},
+		bytes.Repeat([]byte{0xff}, 100),
+		bytes.Repeat([]byte{0x00}, 100),
+	}
+
+	for _, tc := range testcases {
+		f.Add(tc)
+	}
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		reader := bytes.NewReader(data)
+		writer := &bytes.Buffer{}
+		decoder := NewDecoder(reader, writer)
+		if err := decoder.Decode(); err != ErrInvalidStructure {
+			t.Logf("Warning: it may be error, feeding garbage cause to successfull decoding: %v", writer.Bytes())
+		}
+	})
+}
